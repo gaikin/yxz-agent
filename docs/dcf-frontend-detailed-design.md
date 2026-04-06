@@ -39,6 +39,8 @@
 - 助手子窗体启动时并行加载智能体列表、历史会话摘要列表和定时任务状态，且不自动打开最近会话
 - 3040 场景中的“查询当日数据”包含“填写日期并点击查询”
 - 本次迭代失败策略为“展示失败并停止调用”，不做自动重试
+- 定时任务到点后由独立右下角弹窗提示用户确认执行
+- 独立右下角弹窗支持一次确认多条待执行定时任务
 
 ## 三、总体设计
 
@@ -90,6 +92,10 @@ flowchart LR
   - 定时任务名称
   - 当前状态
   - 启用/关闭按钮
+- 独立执行确认弹窗
+  - 位于右下角
+  - 展示当前待确认执行概览
+  - 支持一次确认多条待执行任务
 - 智能体区
   - 位于左下角
   - 展示智能体列表
@@ -497,6 +503,7 @@ dcf-subprocess/
     schedule-loader.ts
     schedule-runtime-store.ts
     schedule-run-record-store.ts
+    schedule-pending-execution-store.ts
     schedule-skill-registry.ts
     schedule-skill-runner.ts
   gateway/
@@ -505,6 +512,9 @@ dcf-subprocess/
     frontend-channel-server.ts
     frontend-event-publisher.ts
     frontend-event-handler-registry.ts
+    popup-channel-server.ts
+    popup-event-publisher.ts
+    popup-event-handler-registry.ts
   execution/
     tool-executor.ts
     resource-reader.ts
@@ -615,7 +625,7 @@ interface AuthManager {
 - 加载内置任务
 - 使用 `cron-parser` 计算下次触发时间
 - 仅对已启用且统一自动执行已授权的任务进行注册
-- 到点后直接触发本地 skill 执行
+- 到点后创建待确认执行项并更新执行概览
 - 在关闭任务时取消注册
 
 核心规则：
@@ -660,6 +670,24 @@ type ScheduleRuntimeState = {
 - `ScheduleRuntimeState` 通过开阳持久化 API 保存和恢复
 - DCF 启动时需要合并这两部分数据，形成可调度任务视图
 - 统一自动执行授权状态单独持久化，不保存在单个定时任务运行态中
+
+建议新增待确认执行模型：
+
+```ts
+type SchedulePendingExecutionItem = {
+  executionId: string
+  scheduleId: string
+  scheduleName: string
+  requestedAt: string
+  status: "pending" | "confirmed" | "running" | "completed" | "failed" | "skipped"
+}
+
+type ScheduleExecutionOverview = {
+  pendingCount: number
+  items: SchedulePendingExecutionItem[]
+  updatedAt: string
+}
+```
 
 #### 5.5.2 scheduler-manager 内部职责
 
@@ -710,10 +738,12 @@ type RegisteredJob = {
 
 1. 先检查任务是否仍为启用状态
 2. 先通过 `run-guard` 判断是否允许进入执行
-3. 记录 `lastTriggeredAt`
-4. 调用 `schedule-skill-runner` 执行对应 skill
-5. 不论本次成功或失败，都重新计算下一次触发时间
-6. 重新注册下一轮 `setTimeout`
+3. 若允许执行，则创建 `SchedulePendingExecutionItem`
+4. 更新右下角弹窗概览
+5. 等待用户通过弹窗一次确认当前所有待执行项
+6. 对被确认的执行项串行调用 `schedule-skill-runner`
+7. 不论本次成功或失败，都重新计算下一次触发时间
+8. 重新注册下一轮 `setTimeout`
 
 推荐实现示意：
 
@@ -789,6 +819,7 @@ DCF 启动进入 `schedules_loading` 后，建议执行以下恢复流程：
 - “执行失败”不会自动关闭任务
 - “执行失败”也不会触发补偿执行
 - 本次执行结果仅记录本地状态，不在助手子窗体中展示
+- 到点后不会直接执行，必须经右下角弹窗确认
 
 #### 5.5.7 推荐实现边界
 
@@ -800,6 +831,8 @@ DCF 启动进入 `schedules_loading` 后，建议执行以下恢复流程：
   - 只负责读写任务运行时状态
 - `schedule-run-record-store`
   - 只负责写入任务执行记录
+- `schedule-pending-execution-store`
+  - 只负责维护待确认执行项与执行概览
 - `scheduler-manager`
   - 只负责 `cron-parser` 解析、注册、注销、重算
 - `schedule-skill-registry`
@@ -868,7 +901,28 @@ class FrontendEventController {
 }
 ```
 
-### 5.7 DCF 与后端通信
+### 5.7 右下角弹窗与 DCF 通信
+
+右下角弹窗与助手子窗体独立，通过单独通道接收待执行概览并回传批量确认结果。
+
+DCF 对右下角弹窗提供以下能力：
+
+- 主动推送
+  - `SCHEDULE_EXECUTION_OVERVIEW_UPDATED`
+- 弹窗上行
+  - `CONFIRM_ALL_SCHEDULE_EXECUTIONS`
+  - `DISMISS_ALL_SCHEDULE_EXECUTIONS`
+
+实现约束：
+
+- 弹窗层不维护完整定时任务状态，只消费待执行概览
+- DCF 为右下角弹窗维护独立事件处理 registry
+- `CONFIRM_ALL_SCHEDULE_EXECUTIONS` 以 `executionIds` 为准，确认当前展示的全部待执行项
+- `DISMISS_ALL_SCHEDULE_EXECUTIONS` 表示用户忽略当前展示的全部待执行项
+- 被确认的执行项默认串行执行
+- 当前版本暂不实现自动过期；后续是否增加过期时间机制列为待确认事项
+
+### 5.8 DCF 与后端通信
 
 DCF 对后端只需要承接协议，不承接编排。
 
@@ -952,7 +1006,7 @@ event: message
 data: {"type":"run_started","sessionId":"sess-1001","runId":"run-2001","status":"running"}
 ```
 
-### 5.8 DCF 本地存储
+### 5.9 DCF 本地存储
 
 本次迭代建议本地存储只保存以下内容：
 
@@ -1094,8 +1148,22 @@ sequenceDiagram
     CH->>DCF: SCHEDULE_ENABLE
     DCF-->>CH: SCHEDULE_ENABLED
     CH-->>UI: SCHEDULE_ENABLED
+```
+
+### 6.6 定时任务到点后弹窗确认与串行执行
+
+```mermaid
+sequenceDiagram
+    participant SCH as 本地定时调度器
+    participant DCF as 营小助 DCF 子进程
+    participant POP as 右下角执行确认弹窗
+    participant SKILL as query_3040_today skill
+    participant KY as 开阳 MCP
 
     SCH->>DCF: schedule_due
+    DCF->>DCF: create pending execution item
+    DCF-->>POP: SCHEDULE_EXECUTION_OVERVIEW_UPDATED
+    POP->>DCF: CONFIRM_ALL_SCHEDULE_EXECUTIONS
     DCF->>SKILL: run(query_3040_today)
     SKILL->>KY: callTool(openMenu) + accessToken
     KY-->>DCF: {tabId}
@@ -1103,8 +1171,10 @@ sequenceDiagram
     KY-->>DCF: schema
     SKILL->>KY: callTool(executePageCommands) + accessToken
     KY-->>DCF: success
+    DCF->>DCF: update execution item + run record
+    DCF-->>POP: SCHEDULE_EXECUTION_OVERVIEW_UPDATED
 
-    Note over UI,DCF: 定时任务执行记录本次仅记录，不展示
+    Note over POP,DCF: 弹窗展示的是待执行概览；用户一次确认当前所有待执行项
 ```
 
 ## 七、开发顺序建议

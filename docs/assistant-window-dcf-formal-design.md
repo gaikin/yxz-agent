@@ -30,6 +30,8 @@
 - 支持定时任务触发 3040 当日查询
 - 定时任务通过固定入口 `定时任务` 进入轻量面板并执行启用、关闭操作
 - 用户首次打开子窗体时需要完成统一自动执行授权，授权成功后按 `cron` 自动执行
+- 定时任务到点后由独立右下角弹窗提示用户确认执行
+- 独立右下角弹窗支持一次确认多条待执行定时任务
 - 助手子窗体支持多智能体对象展示与会话绑定
 - 点击创建会话时即创建真实会话，`sessionId` 由后端生成
 - 助手子窗体与 DCF 子进程通过 `JSBridge` 通信
@@ -139,6 +141,10 @@ DCF 子进程承担以下职责：
 - 定时任务入口区
   - 固定入口名称为 `定时任务`
   - 点击后打开轻量面板
+- 独立执行确认弹窗
+  - 位于右下角
+  - 展示当前待确认执行概览
+  - 支持一次确认多条待执行任务
 - 智能体区
   - 位于左下角
   - 展示智能体列表
@@ -445,6 +451,7 @@ dcf-subprocess/
     schedule-loader.ts
     schedule-runtime-store.ts
     schedule-run-record-store.ts
+    schedule-pending-execution-store.ts
     schedule-skill-registry.ts
     schedule-skill-runner.ts
   gateway/
@@ -453,6 +460,9 @@ dcf-subprocess/
     frontend-channel-server.ts
     frontend-event-publisher.ts
     frontend-event-handler-registry.ts
+    popup-channel-server.ts
+    popup-event-publisher.ts
+    popup-event-handler-registry.ts
   execution/
     tool-executor.ts
     resource-reader.ts
@@ -579,8 +589,26 @@ type ScheduleRuntimeState = {
 - 读取 `cronExpression` 与 `timezone`
 - 计算 `nextTriggerAt`
 - 为已启用任务注册 `setTimeout`
-- 到点后触发本地 `schedule-skill-runner`
+- 到点后创建待确认执行项并更新执行概览
 - 触发后重新计算下一次触发时间
+
+建议新增待确认执行模型：
+
+```ts
+type SchedulePendingExecutionItem = {
+  executionId: string
+  scheduleId: string
+  scheduleName: string
+  requestedAt: string
+  status: "pending" | "confirmed" | "running" | "completed" | "failed" | "skipped"
+}
+
+type ScheduleExecutionOverview = {
+  pendingCount: number
+  items: SchedulePendingExecutionItem[]
+  updatedAt: string
+}
+```
 
 #### 恢复逻辑
 
@@ -600,6 +628,13 @@ DCF 启动后恢复流程如下：
 - 关闭任务时注销调度
 - 执行失败仅记录失败结果，不自动重试
 - DCF 重启后保留启用状态
+- DCF 内部维护待确认执行项列表，不引入独立 `batch` 领域对象
+- 右下角弹窗只展示当前待确认执行项的概览视图
+- 用户可一次确认当前所有待确认执行项
+- 被确认的执行项默认串行执行，避免本地页面操作互相干扰
+- 若同一 `scheduleId` 在 `pending` 或 `running` 时再次到点，新增新的待确认执行项
+- 右下角弹窗概览不做聚合，逐条展示待执行项，并在每条任务后附触发时间
+- 当前版本暂不实现自动过期机制；“是否引入过期时间”列为待确认事项
 
 ### 7.6 本地存储
 
@@ -677,7 +712,33 @@ class FrontendEventController {
 }
 ```
 
-### 8.2 DCF 子进程与后端
+### 8.2 右下角弹窗与 DCF 子进程
+
+右下角弹窗与助手子窗体独立，通过单独通道接收待执行概览并回传批量确认结果。
+
+DCF 对右下角弹窗提供以下能力：
+
+- 主动推送
+  - `SCHEDULE_EXECUTION_OVERVIEW_UPDATED`
+- 弹窗上行
+  - `CONFIRM_ALL_SCHEDULE_EXECUTIONS`
+  - `DISMISS_ALL_SCHEDULE_EXECUTIONS`
+
+设计约束如下：
+
+- 弹窗层不维护完整定时任务状态，只消费待执行概览
+- DCF 为右下角弹窗维护独立事件处理 registry
+- `CONFIRM_ALL_SCHEDULE_EXECUTIONS` 以 `executionIds` 为准，确认当前展示的全部待执行项
+- `DISMISS_ALL_SCHEDULE_EXECUTIONS` 表示用户忽略当前展示的全部待执行项，本次执行请求记为 `skipped`
+- 当前版本暂不实现自动过期；后续是否增加过期时间机制列为待确认事项
+
+建议弹窗文案如下：
+
+- 标题：`有 N 个定时任务待执行`
+- 内容：逐条展示任务名称和触发时间，例如 `3040每日查询 09:00`
+- 操作：`全部执行`、`忽略`
+
+### 8.3 DCF 子进程与后端
 
 通信方式如下：
 
@@ -849,8 +910,22 @@ sequenceDiagram
     CH->>DCF: SCHEDULE_ENABLE
     DCF-->>CH: SCHEDULE_ENABLED
     CH-->>UI: SCHEDULE_ENABLED
+```
+
+### 9.6 定时任务到点后弹窗确认与串行执行
+
+```mermaid
+sequenceDiagram
+    participant SCH as 本地定时调度器
+    participant DCF as 营小助 DCF 子进程
+    participant POP as 右下角执行确认弹窗
+    participant SKILL as query_3040_today skill
+    participant KY as 开阳 MCP
 
     SCH->>DCF: schedule_due
+    DCF->>DCF: create pending execution item
+    DCF-->>POP: SCHEDULE_EXECUTION_OVERVIEW_UPDATED
+    POP->>DCF: CONFIRM_ALL_SCHEDULE_EXECUTIONS
     DCF->>SKILL: run(query_3040_today)
     SKILL->>KY: callTool(openMenu) + accessToken
     KY-->>DCF: {tabId}
@@ -858,6 +933,8 @@ sequenceDiagram
     KY-->>DCF: schema
     SKILL->>KY: callTool(executePageCommands) + accessToken
     KY-->>DCF: success
+    DCF->>DCF: update execution item + run record
+    DCF-->>POP: SCHEDULE_EXECUTION_OVERVIEW_UPDATED
 ```
 
 ## 10. 异常处理

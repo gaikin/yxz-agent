@@ -172,6 +172,11 @@
   - 输入：步骤流、执行结果
   - 输出：任务执行记录
 
+- `schedule-pending-execution-store`
+  - 职责：保存待确认执行项和待执行概览
+  - 输入：到点触发、确认结果、忽略结果、执行结果
+  - 输出：待确认执行项与概览
+
 - `scheduler-manager`
   - 职责：使用 `cron-parser` 计算 `nextTriggerAt`，并以 `setTimeout` 方式注册与注销任务
   - 输入：已启用任务
@@ -191,6 +196,11 @@
   - 职责：执行定时任务对应 skill，生成页面原子命令并收敛结果
   - 输入：`scheduleId`、任务定义、运行上下文
   - 输出：执行结果、步骤记录
+
+- `popup-channel-server`
+  - 职责：向独立右下角弹窗推送待执行概览，并接收批量确认结果
+  - 输入：待执行概览、弹窗确认事件
+  - 输出：批量确认请求
 
 - `backend-gateway-client`
   - 职责：与后端 Agent Gateway 通信

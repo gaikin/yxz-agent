@@ -32,6 +32,14 @@ export type ScheduleExecutionStatus =
   | "completed"
   | "failed"
 
+export type SchedulePendingExecutionStatus =
+  | "pending"
+  | "confirmed"
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped"
+
 export interface AutomationAuthorizationState {
   authorized: boolean
   authorizedAt?: ISODateTime
@@ -268,6 +276,20 @@ export interface ScheduleSummary {
   lastTriggeredAt?: ISODateTime
   lastCompletedAt?: ISODateTime
   lastStatus?: ScheduleExecutionStatus
+}
+
+export interface SchedulePendingExecutionItem {
+  executionId: string
+  scheduleId: string
+  scheduleName: string
+  requestedAt: ISODateTime
+  status: SchedulePendingExecutionStatus
+}
+
+export interface ScheduleExecutionOverview {
+  pendingCount: number
+  items: SchedulePendingExecutionItem[]
+  updatedAt: ISODateTime
 }
 
 export interface ScheduleStateEvent {
@@ -690,6 +712,27 @@ export interface FrontendRunCancelledEvent {
   sentAt: ISODateTime
 }
 
+export interface PopupScheduleExecutionOverviewUpdatedEvent {
+  type: "SCHEDULE_EXECUTION_OVERVIEW_UPDATED"
+  deviceId: DeviceId
+  overview: ScheduleExecutionOverview
+  sentAt: ISODateTime
+}
+
+export interface PopupConfirmAllScheduleExecutionsEvent {
+  type: "CONFIRM_ALL_SCHEDULE_EXECUTIONS"
+  deviceId: DeviceId
+  executionIds: string[]
+  sentAt: ISODateTime
+}
+
+export interface PopupDismissAllScheduleExecutionsEvent {
+  type: "DISMISS_ALL_SCHEDULE_EXECUTIONS"
+  deviceId: DeviceId
+  executionIds: string[]
+  sentAt: ISODateTime
+}
+
 export type DcfToBackendEvent =
   | CreateSessionEvent
   | ListAgentsEvent
@@ -749,3 +792,9 @@ export type DcfToFrontendEvent =
   | FrontendScheduleStateSnapshotEvent
   | FrontendScheduleEnabledEvent
   | FrontendScheduleDisabledEvent
+
+export type PopupToDcfEvent =
+  | PopupConfirmAllScheduleExecutionsEvent
+  | PopupDismissAllScheduleExecutionsEvent
+
+export type DcfToPopupEvent = PopupScheduleExecutionOverviewUpdatedEvent

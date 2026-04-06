@@ -145,6 +145,16 @@
   - 支持读取任务摘要
   - 支持更新 `enabled`、`lastStatus`、`nextTriggerAt`、`lastRunId`
 
+#### T9.1 实现待确认执行项存储
+
+- 目标：保存定时任务待确认执行项与概览状态
+- 负责模块：
+  - `scheduler/schedule-pending-execution-store.ts`
+- 验收标准：
+  - 可新增待确认执行项
+  - 可按当前待确认项生成概览
+  - 可更新 `pending / confirmed / running / completed / failed / skipped` 状态
+
 #### T10 实现统一自动执行授权流程
 
 - 目标：支持“首次打开子窗体 -> 统一授权 -> 后续可启用定时任务”
@@ -191,6 +201,20 @@
   - 能根据 `skillId` 找到并执行对应 skill
   - 能记录步骤流和最终结果
   - 执行失败时能返回结构化错误并落本地记录
+
+#### T13.1 实现右下角执行确认弹窗通道
+
+- 目标：支持独立右下角弹窗展示待执行概览，并一次确认多条待执行任务
+- 负责模块：
+  - `channel/popup-channel-server.ts`
+  - `channel/popup-event-publisher.ts`
+  - `channel/popup-event-handler-registry.ts`
+- 验收标准：
+  - 到点后可向右下角弹窗推送 `SCHEDULE_EXECUTION_OVERVIEW_UPDATED`
+  - 可接收 `CONFIRM_ALL_SCHEDULE_EXECUTIONS`
+  - 可接收 `DISMISS_ALL_SCHEDULE_EXECUTIONS`
+  - 被确认的待执行项默认串行执行
+  - 过期时间机制暂列为待确认事项，本阶段不实现
 
 ### M4 助手子窗体交互打通
 
@@ -308,7 +332,9 @@
 - 验收标准：
   - 首次打开子窗体时可完成统一自动执行授权
   - 统一授权后任务进入已启用状态
-  - 到点后自动触发本地 skill 执行
+  - 到点后可通过独立右下角弹窗展示待执行概览
+  - 用户可一次确认多条待执行任务
+  - 被确认任务按顺序执行本地 skill
   - 结果可回写到定时任务状态和本地执行记录
 
 ## 五、依赖关系

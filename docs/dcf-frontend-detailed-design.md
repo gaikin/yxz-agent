@@ -1011,6 +1011,76 @@ event: message
 data: {"type":"run_started","sessionId":"sess-1001","runId":"run-2001","status":"running"}
 ```
 
+#### 5.8.1 skill 设计
+
+本次内测版的 skill 采用最小结构化语言定义，优先目标是跑通执行链路并保证稳定性。
+
+设计原则如下：
+
+- skill 使用结构化语言定义，不使用自然语言作为执行载体
+- skill 顶层不定义 `input`
+- skill 顶层不定义 `context`
+- skill 顶层不定义 `result.extract`
+- skill 内不显式定义 `onError`
+- skill 只描述按顺序执行的一组 `tools`
+- 当前版本组件定位直接使用固定 `componentId`
+- 不在 skill 内做动态组件定位
+- 全部 tools 成功时，默认返回最后一个 tool 的原始结果
+- 任一 tool 失败时，由 skill engine 统一映射平台级错误
+
+建议的最小 schema 如下：
+
+```yaml
+skillId: query_3040_today
+name: 3040当日查询
+description: 打开3040，点击查询，并直接返回最后一个工具结果
+version: 1
+
+tools:
+  - toolId: open_menu
+    tool: openMenu
+    args:
+      menuShortCode: "3040"
+    saveAs: tabInfo
+
+  - toolId: execute_query
+    tool: executePageCommands
+    args:
+      tabIdFrom: tabInfo.tabId
+      commands:
+        - componentId: btn_query_1
+          command: click
+    saveAs: queryResult
+```
+
+说明如下：
+
+- `toolId` 用于运行记录与调试定位
+- `tool` 表示实际执行的工具名
+- `args` 只支持字面量与 `xxxFrom` 路径引用
+- `saveAs` 将当前 tool 原始结果写入运行时上下文
+
+skill engine 执行规则如下：
+
+- 按顺序执行 `tools`
+- 全部成功时返回最后一个 tool 的原始结果
+- 失败时统一返回：
+  - `MENU_OPEN_FAILED`
+  - `SCHEMA_READ_FAILED`
+  - `TARGET_NOT_FOUND`
+  - `TARGET_NOT_UNIQUE`
+  - `COMMAND_EXECUTION_FAILED`
+  - `EXECUTION_BLOCKED`
+  - `RUNTIME_EXCEPTION`
+
+本期明确不做以下能力：
+
+- skill 自定义错误码
+- skill 级 `onError`
+- 自然语言 skill
+- skill 内动态组件定位
+- 条件分支、循环、复杂表达式
+
 ### 5.9 DCF 本地存储
 
 本次迭代建议本地存储只保存以下内容：

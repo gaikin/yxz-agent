@@ -14,6 +14,10 @@
 
 本文档不展开后端 Agent 内部编排实现，仅定义其对外接口与交互边界。
 
+本文档中的关键规则和版本性取舍优先从讨论记录文档提取并沉淀，讨论源文档见：
+
+- [discussion-decisions.md](C:/dev/projects/work/yxz-agent/docs/discussion-decisions.md)
+
 相关文档：
 
 - 总体方案：[agent-chat-architecture.md](C:/dev/projects/work/yxz-agent/docs/agent-chat-architecture.md)

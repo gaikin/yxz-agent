@@ -13,6 +13,10 @@
 - 与 DCF 子进程的通信协议
 - 关键时序图中的交互角色
 
+本文档中的关键规则和版本性取舍优先从讨论记录文档提取并沉淀，讨论源文档见：
+
+- [discussion-decisions.md](C:/dev/projects/work/yxz-agent/docs/discussion-decisions.md)
+
 总方案见：[agent-chat-architecture.md](C:/dev/projects/work/yxz-agent/docs/agent-chat-architecture.md)
 
 ## 二、实现边界

@@ -10,6 +10,10 @@
 - 支持定时任务触发 3040 当日查询。
 - 用户首次打开助手子窗体时，需完成一次统一自动执行授权；授权成功后，后续按 `cron` 自动执行。
 
+本方案中的关键规则和版本性取舍优先从讨论记录文档提取并沉淀，讨论源文档见：
+
+- [discussion-decisions.md](C:/dev/projects/work/yxz-agent/docs/discussion-decisions.md)
+
 ## 二、现状
 
 当前已知条件如下：

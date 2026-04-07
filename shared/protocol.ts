@@ -31,6 +31,7 @@ export type ScheduleExecutionStatus =
   | "running"
   | "completed"
   | "failed"
+  | "skipped"
 
 export type SchedulePendingExecutionStatus =
   | "pending"

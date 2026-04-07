@@ -15,6 +15,11 @@ import { loadConfig } from "./configLoader"
 import { FrontendEventPublisher, type FrontendEventSink } from "../channel/frontendEventPublisher"
 import { PopupEventPublisher, type PopupEventSink } from "../channel/popupEventPublisher"
 import { FrontendEventHandlerRegistry, PopupEventHandlerRegistry } from "../channel/handlerFramework"
+import {
+  CompositePendingExecutionNotifier,
+  HostPendingExecutionNotifier,
+  type HostPendingExecutionCallback,
+} from "../channel/pendingExecutionNotifier"
 import { FrontendChannelServer } from "../channel/frontendChannelServer"
 import { PopupChannelServer } from "../channel/popupChannelServer"
 import { FrontendEventController } from "../channel/frontendEventController"
@@ -33,6 +38,7 @@ export interface DcfBootstrapDependencies {
   popupSink: PopupEventSink
   toolTransport: JsonRpcToolTransport
   rumJsCache: RumJsCacheApi
+  hostPendingExecutionCallback?: HostPendingExecutionCallback
 }
 
 export interface DcfRuntime {
@@ -83,6 +89,12 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
     deviceId,
     schedulePendingExecutionStore
   )
+  const pendingExecutionNotifier = deps.hostPendingExecutionCallback
+    ? new CompositePendingExecutionNotifier([
+        popupEventPublisher,
+        new HostPendingExecutionNotifier(deps.hostPendingExecutionCallback),
+      ])
+    : popupEventPublisher
 
   const mcpToolClient = new JsonRpcMcpToolClient(deps.toolTransport)
   const toolHandlerRegistry = new ToolHandlerRegistry()
@@ -100,7 +112,7 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
     schedulePendingExecutionStore,
     scheduleRunRecordStore,
     scheduleRuntimeStore,
-    popupEventPublisher,
+    pendingExecutionNotifier,
     frontendEventPublisher,
     skillRunner
   )

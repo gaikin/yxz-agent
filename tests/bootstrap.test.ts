@@ -152,3 +152,53 @@ test("dcf bootstrap publishes bootstrap state using rumJs cache backed stores", 
   assert.equal((frontendEvents[0] as { type: string }).type, "BOOTSTRAP_STATE")
   assert.equal(popupEvents.length, 0)
 })
+
+test("dcf bootstrap supports host pending execution callback together with popup publishing", async () => {
+  const frontendEvents: unknown[] = []
+  const popupEvents: unknown[] = []
+  const hostOverviews: unknown[] = []
+
+  const runtime = await bootstrapDcf({
+    workspaceRoot: process.cwd(),
+    frontendSink: {
+      async publish(event) {
+        frontendEvents.push(event)
+      },
+    },
+    popupSink: {
+      async publish(event) {
+        popupEvents.push(event)
+      },
+    },
+    toolTransport: {
+      async send() {
+        return {
+          result: {
+            content: [{ type: "text", text: "{}" }],
+          },
+        }
+      },
+    },
+    rumJsCache: new MemoryRumJsCache(),
+    hostPendingExecutionCallback: {
+      async onPendingExecutionsUpdated(overview) {
+        hostOverviews.push(overview)
+      },
+    },
+  })
+
+  await runtime.schedulerManager.trigger(
+    {
+      scheduleId: "schedule_3040_daily",
+      name: "3040每日查询",
+      cronExpression: "0 0 9 * * *",
+      timezone: "Asia/Shanghai",
+      skillId: "query_3040_today",
+    },
+    new Date("2026-04-07T09:00:00+08:00")
+  )
+
+  assert.equal(frontendEvents.length >= 1, true)
+  assert.equal(popupEvents.length, 1)
+  assert.equal(hostOverviews.length, 1)
+})

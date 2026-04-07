@@ -1,7 +1,7 @@
 import type { SchedulePendingExecutionItem } from "../../shared/protocol"
 import { createId } from "../common/id"
 import { SchedulePendingExecutionStore, ScheduleRunRecordStore, ScheduleRuntimeStore } from "./stores"
-import type { FrontendEventPublisher, PopupEventPublisher, ScheduleDefinition } from "./types"
+import type { FrontendEventPublisher, PendingExecutionNotifier, ScheduleDefinition } from "./types"
 import { ScheduleSkillRunner } from "./scheduleSkillRunner"
 
 export class ScheduleExecutionCoordinator {
@@ -11,7 +11,7 @@ export class ScheduleExecutionCoordinator {
     private readonly pendingStore: SchedulePendingExecutionStore,
     private readonly runRecordStore: ScheduleRunRecordStore,
     private readonly runtimeStore: ScheduleRuntimeStore,
-    private readonly popupPublisher: PopupEventPublisher,
+    private readonly pendingExecutionNotifier: PendingExecutionNotifier,
     private readonly frontendPublisher: FrontendEventPublisher,
     private readonly skillRunner: ScheduleSkillRunner
   ) {}
@@ -30,7 +30,7 @@ export class ScheduleExecutionCoordinator {
       lastTriggeredAt: item.requestedAt,
     })
     if (!this.executing) {
-      await this.popupPublisher.publishOverview()
+      await this.notifyPendingOverview()
     }
   }
 
@@ -47,7 +47,7 @@ export class ScheduleExecutionCoordinator {
       snapshot.map((item) => item.executionId),
       "confirmed"
     )
-    await this.popupPublisher.publishOverview()
+    await this.notifyPendingOverview()
 
     if (this.executing) {
       return
@@ -116,7 +116,7 @@ export class ScheduleExecutionCoordinator {
       }
     } finally {
       this.executing = false
-      await this.popupPublisher.publishOverview()
+      await this.notifyPendingOverview()
     }
   }
 
@@ -138,7 +138,7 @@ export class ScheduleExecutionCoordinator {
         },
       })
     }
-    await this.popupPublisher.publishOverview()
+    await this.notifyPendingOverview()
   }
 
   async enableSchedule(scheduleId: string, nextTriggerAt?: string): Promise<void> {
@@ -157,5 +157,10 @@ export class ScheduleExecutionCoordinator {
       lastStatus: "disabled",
     })
     await this.frontendPublisher.publishScheduleDisabled(scheduleId)
+  }
+
+  private async notifyPendingOverview(): Promise<void> {
+    const overview = await this.pendingStore.getPendingOverview()
+    await this.pendingExecutionNotifier.notify(overview)
   }
 }

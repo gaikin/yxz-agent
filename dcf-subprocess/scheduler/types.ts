@@ -43,6 +43,10 @@ export interface PopupEventPublisher {
   publishOverview(): Promise<void>
 }
 
+export interface PendingExecutionNotifier {
+  notify(overview: import("../../shared/protocol").ScheduleExecutionOverview): Promise<void>
+}
+
 export interface FrontendEventPublisher {
   publishBootstrapState(): Promise<void>
   publishAutomationAuthorized(authorizedAt: string): Promise<void>

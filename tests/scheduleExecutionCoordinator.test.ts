@@ -6,14 +6,24 @@ import {
   ScheduleRunRecordStore,
   ScheduleRuntimeStore,
 } from "../dcf-subprocess/scheduler/stores"
-import type { FrontendEventPublisher, PopupEventPublisher, ScheduleDefinition } from "../dcf-subprocess/scheduler/types"
+import type {
+  FrontendEventPublisher,
+  PendingExecutionNotifier,
+  PopupEventPublisher,
+  ScheduleDefinition,
+} from "../dcf-subprocess/scheduler/types"
 import type { SkillExecutionResult } from "../dcf-subprocess/skills/types"
+import type { ScheduleExecutionOverview } from "../shared/protocol"
 import type { RumJsCacheApi } from "../dcf-subprocess/common/rumJsJsonStore"
 
-class MemoryPopupPublisher implements PopupEventPublisher {
+class MemoryPopupPublisher implements PopupEventPublisher, PendingExecutionNotifier {
   calls = 0
 
   async publishOverview(): Promise<void> {
+    this.calls += 1
+  }
+
+  async notify(_overview: ScheduleExecutionOverview): Promise<void> {
     this.calls += 1
   }
 }

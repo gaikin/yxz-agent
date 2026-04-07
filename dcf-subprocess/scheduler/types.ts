@@ -36,7 +36,6 @@ export interface ScheduleRunRecord {
 }
 
 export interface DcfConfig {
-  dataDir: string
   schedules: ScheduleDefinition[]
 }
 

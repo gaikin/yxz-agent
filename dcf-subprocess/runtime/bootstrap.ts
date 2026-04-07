@@ -1,31 +1,30 @@
-import path from "node:path"
-import { AutomationAuthorizationStore } from "../scheduler/automation-authorization-store"
-import { ScheduleLoader } from "../scheduler/schedule-loader"
-import { SchedulePendingExecutionStore } from "../scheduler/schedule-pending-execution-store"
-import { ScheduleRunRecordStore } from "../scheduler/schedule-run-record-store"
-import { ScheduleRuntimeStore } from "../scheduler/schedule-runtime-store"
-import { ScheduleSkillRegistry } from "../scheduler/schedule-skill-registry"
-import { ScheduleSkillRunner } from "../scheduler/schedule-skill-runner"
-import { ScheduleExecutionCoordinator } from "../scheduler/schedule-execution-coordinator"
-import { SchedulerManager } from "../scheduler/scheduler-manager"
-import { RuntimeState } from "./runtime-state"
-import { loadConfig } from "./config-loader"
-import { FrontendEventPublisher, type FrontendEventSink } from "../channel/frontend-event-publisher"
-import { PopupEventPublisher, type PopupEventSink } from "../channel/popup-event-publisher"
-import { FrontendEventHandlerRegistry } from "../channel/frontend-event-handler-registry"
-import { PopupEventHandlerRegistry } from "../channel/popup-event-handler-registry"
-import { FrontendChannelServer } from "../channel/frontend-channel-server"
-import { PopupChannelServer } from "../channel/popup-channel-server"
-import { FrontendEventController } from "../channel/frontend-event-controller"
-import { PopupEventController } from "../channel/popup-event-controller"
-import { ToolHandlerRegistry } from "../execution/tool-handler-registry"
-import { DefaultToolExecutor } from "../execution/tool-executor"
-import { JsonRpcMcpToolClient, type JsonRpcToolTransport } from "../execution/mcp-tool-client"
-import { OpenMenuHandler } from "../execution/handlers/open-menu-handler"
-import { ExecutePageCommandsHandler } from "../execution/handlers/execute-page-commands-handler"
-import { ReadSchemaHandler } from "../execution/handlers/read-schema-handler"
-import { SkillEngine } from "../skills/skill-engine"
-import { query3040TodaySkill } from "../skills/query_3040_today"
+import {
+  AutomationAuthorizationStore,
+  ScheduleLoader,
+  SchedulePendingExecutionStore,
+  ScheduleRunRecordStore,
+  ScheduleRuntimeStore,
+} from "../scheduler/stores"
+import type { RumJsCacheApi } from "../common/rumJsJsonStore"
+import { ScheduleSkillRegistry } from "../scheduler/scheduleSkillRegistry"
+import { ScheduleSkillRunner } from "../scheduler/scheduleSkillRunner"
+import { ScheduleExecutionCoordinator } from "../scheduler/scheduleExecutionCoordinator"
+import { SchedulerManager } from "../scheduler/schedulerManager"
+import { RuntimeState } from "./runtimeState"
+import { loadConfig } from "./configLoader"
+import { FrontendEventPublisher, type FrontendEventSink } from "../channel/frontendEventPublisher"
+import { PopupEventPublisher, type PopupEventSink } from "../channel/popupEventPublisher"
+import { FrontendEventHandlerRegistry, PopupEventHandlerRegistry } from "../channel/handlerFramework"
+import { FrontendChannelServer } from "../channel/frontendChannelServer"
+import { PopupChannelServer } from "../channel/popupChannelServer"
+import { FrontendEventController } from "../channel/frontendEventController"
+import { PopupEventController } from "../channel/popupEventController"
+import { ToolHandlerRegistry } from "../execution/toolHandlerRegistry"
+import { DefaultToolExecutor } from "../execution/toolExecutor"
+import { JsonRpcMcpToolClient, type JsonRpcToolTransport } from "../execution/mcpToolClient"
+import { ExecutePageCommandsHandler, OpenMenuHandler, ReadSchemaHandler } from "../execution/toolHandlers"
+import { SkillEngine } from "../skills/skillEngine"
+import { query3040TodaySkill } from "../skills/query3040Today"
 
 export interface DcfBootstrapDependencies {
   workspaceRoot: string
@@ -33,6 +32,7 @@ export interface DcfBootstrapDependencies {
   frontendSink: FrontendEventSink
   popupSink: PopupEventSink
   toolTransport: JsonRpcToolTransport
+  rumJsCache: RumJsCacheApi
 }
 
 export interface DcfRuntime {
@@ -52,17 +52,21 @@ export interface DcfRuntime {
 
 export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfRuntime> {
   const config = loadConfig(deps.workspaceRoot)
-  const dataDir = config.dataDir
   const deviceId = deps.deviceId ?? "device-001"
 
   const automationAuthorizationStore = new AutomationAuthorizationStore(
-    path.join(dataDir, "automation-authorization.json")
+    deps.rumJsCache,
+    "automation-authorization.json"
   )
   const scheduleLoader = new ScheduleLoader(config.schedules)
-  const scheduleRuntimeStore = new ScheduleRuntimeStore(path.join(dataDir, "schedule-runtime.json"))
-  const scheduleRunRecordStore = new ScheduleRunRecordStore(path.join(dataDir, "schedule-run-records.json"))
+  const scheduleRuntimeStore = new ScheduleRuntimeStore(deps.rumJsCache, "schedule-runtime.json")
+  const scheduleRunRecordStore = new ScheduleRunRecordStore(
+    deps.rumJsCache,
+    "schedule-run-records.json"
+  )
   const schedulePendingExecutionStore = new SchedulePendingExecutionStore(
-    path.join(dataDir, "schedule-pending-executions.json")
+    deps.rumJsCache,
+    "schedule-pending-executions.json"
   )
   const runtimeState = new RuntimeState()
 

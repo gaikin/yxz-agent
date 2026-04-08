@@ -2,6 +2,7 @@ import type { DcfConfig } from "../scheduler/types"
 
 export function loadConfig(_workspaceRoot: string): DcfConfig {
   return {
+    mcpEndpoint: "http://127.0.0.1:26666/mcp",
     schedules: [
       {
         scheduleId: "schedule_3040_daily",

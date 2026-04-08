@@ -26,7 +26,11 @@ import { FrontendEventController } from "../channel/frontendEventController"
 import { PopupEventController } from "../channel/popupEventController"
 import { ToolHandlerRegistry } from "../execution/toolHandlerRegistry"
 import { DefaultToolExecutor } from "../execution/toolExecutor"
-import { JsonRpcMcpToolClient, type JsonRpcToolTransport } from "../execution/mcpToolClient"
+import {
+  HttpJsonRpcToolTransport,
+  JsonRpcMcpToolClient,
+  type JsonRpcToolTransport,
+} from "../execution/mcpToolClient"
 import { ExecutePageCommandsHandler, OpenMenuHandler, ReadSchemaHandler } from "../execution/toolHandlers"
 import { SkillEngine } from "../skills/skillEngine"
 import { query3040TodaySkill } from "../skills/query3040Today"
@@ -36,7 +40,7 @@ export interface DcfBootstrapDependencies {
   deviceId?: string
   frontendSink: FrontendEventSink
   popupSink: PopupEventSink
-  toolTransport: JsonRpcToolTransport
+  toolTransport?: JsonRpcToolTransport
   rumJsCache: RumJsCacheApi
   hostPendingExecutionCallback?: HostPendingExecutionCallback
 }
@@ -96,7 +100,8 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
       ])
     : popupEventPublisher
 
-  const mcpToolClient = new JsonRpcMcpToolClient(deps.toolTransport)
+  const toolTransport = deps.toolTransport ?? new HttpJsonRpcToolTransport(config.mcpEndpoint)
+  const mcpToolClient = new JsonRpcMcpToolClient(toolTransport)
   const toolHandlerRegistry = new ToolHandlerRegistry()
   toolHandlerRegistry.register(new OpenMenuHandler(mcpToolClient))
   toolHandlerRegistry.register(new ExecutePageCommandsHandler(mcpToolClient))

@@ -36,6 +36,7 @@ export interface ScheduleRunRecord {
 }
 
 export interface DcfConfig {
+  mcpEndpoint: string
   schedules: ScheduleDefinition[]
 }
 

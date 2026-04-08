@@ -12,6 +12,26 @@ export interface JsonRpcToolTransport {
   send(request: JsonRpcToolCallRequest): Promise<unknown>
 }
 
+export class HttpJsonRpcToolTransport implements JsonRpcToolTransport {
+  constructor(private readonly endpoint: string) {}
+
+  async send(request: JsonRpcToolCallRequest): Promise<unknown> {
+    const response = await fetch(this.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(request),
+    })
+
+    if (!response.ok) {
+      throw new Error(`MCP request failed: ${response.status}`)
+    }
+
+    return response.json()
+  }
+}
+
 export interface McpToolClient {
   call(name: string, args: Record<string, unknown>): Promise<unknown>
 }
@@ -35,4 +55,3 @@ export class JsonRpcMcpToolClient implements McpToolClient {
     return this.transport.send(request)
   }
 }
-

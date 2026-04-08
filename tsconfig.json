@@ -3,6 +3,7 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,8 +15,11 @@
   },
   "include": [
     "shared/**/*.ts",
-    "dcf-subprocess/**/*.ts",
-    "frontend/**/*.ts",
+    "types/**/*.ts",
+    "service/**/*.ts",
+    "dcf/**/*.ts",
+    "webapp/src/**/*.ts",
+    "webapp/src/**/*.tsx",
     "tests/**/*.ts"
   ]
 }

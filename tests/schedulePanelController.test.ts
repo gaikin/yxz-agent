@@ -1,8 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { ScheduleStore } from "../frontend/stores/scheduleStore"
-import { SchedulePanelController } from "../frontend/controllers/schedulePanelController"
-import type { AssistantWindowChannelClient } from "../frontend/services/assistantWindowChannelClient"
+import { ScheduleStore } from "../webapp/src/assistant/scheduleStore"
+import { SchedulePanelController } from "../webapp/src/assistant/schedulePanelController"
+import type { AssistantWindowChannelClient } from "../webapp/src/assistant/assistantWindowChannelClient"
 
 class MemoryAssistantWindowChannelClient {
   authorizeCalls = 0
@@ -89,3 +89,4 @@ test("enable and disable use current schedule from store", async () => {
   assert.deepEqual(channelClient.enabledScheduleIds, ["schedule_3040_daily"])
   assert.deepEqual(channelClient.disabledScheduleIds, ["schedule_3040_daily"])
 })
+

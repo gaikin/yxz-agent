@@ -1,20 +1,20 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { ScheduleExecutionCoordinator } from "../dcf-subprocess/scheduler/scheduleExecutionCoordinator"
+import { ScheduleExecutionCoordinator } from "../dcf/scheduler/scheduleExecutionCoordinator"
 import {
   SchedulePendingExecutionStore,
   ScheduleRunRecordStore,
   ScheduleRuntimeStore,
-} from "../dcf-subprocess/scheduler/stores"
+} from "../dcf/scheduler/stores"
 import type {
   FrontendEventPublisher,
   PendingExecutionNotifier,
   PopupEventPublisher,
   ScheduleDefinition,
-} from "../dcf-subprocess/scheduler/types"
-import type { SkillExecutionResult } from "../dcf-subprocess/skills/types"
-import type { ScheduleExecutionOverview } from "../types/appProtocol"
-import type { RumJsCacheApi } from "../dcf-subprocess/common/rumJsJsonStore"
+} from "../dcf/scheduler/types"
+import type { SkillExecutionResult } from "../dcf/skills/types"
+import type { ScheduleExecutionOverview } from "../types/frontendProtocol"
+import type { RumJsCacheApi } from "../dcf/common/rumJsJsonStore"
 
 class MemoryPopupPublisher implements PopupEventPublisher, PendingExecutionNotifier {
   calls = 0
@@ -106,7 +106,7 @@ async function createCoordinator() {
 const schedule3040: ScheduleDefinition = {
   scheduleId: "schedule_3040_daily",
   name: "3040每日查询",
-  cronExpression: "0 0 9 * * *",
+  cronExpression: "0 0 10 * * *",
   timezone: "Asia/Shanghai",
   skillId: "query_3040_today",
 }
@@ -114,7 +114,7 @@ const schedule3040: ScheduleDefinition = {
 test("onScheduleDue creates pending item and updates overview", async () => {
   const { coordinator, pendingStore, popupPublisher, runtimeStore } = await createCoordinator()
 
-  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T09:00:00+08:00"))
+  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T10:00:00+08:00"))
 
   const items = await pendingStore.list()
   assert.equal(items.length, 1)
@@ -122,13 +122,13 @@ test("onScheduleDue creates pending item and updates overview", async () => {
   assert.equal(popupPublisher.calls, 1)
 
   const runtime = await runtimeStore.get(schedule3040.scheduleId)
-  assert.equal(runtime?.lastTriggeredAt, "2026-04-07T01:00:00.000Z")
+  assert.equal(runtime?.lastTriggeredAt, "2026-04-07T02:00:00.000Z")
 })
 
 test("dismissAll marks shown items as skipped and updates runtime", async () => {
   const { coordinator, pendingStore, runtimeStore, runRecordStore } = await createCoordinator()
 
-  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T09:00:00+08:00"))
+  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T10:00:00+08:00"))
   const [item] = await pendingStore.list()
 
   await coordinator.dismissAll([item.executionId])
@@ -144,7 +144,7 @@ test("dismissAll marks shown items as skipped and updates runtime", async () => 
 test("confirmAll uses snapshot only and keeps new due items pending", async () => {
   const { coordinator, pendingStore, popupPublisher, skillRunner } = await createCoordinator()
 
-  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T09:00:00+08:00"))
+  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T10:00:00+08:00"))
   const [first] = await pendingStore.list()
 
   const confirmPromise = coordinator.confirmAll([first.executionId], [schedule3040])
@@ -156,7 +156,7 @@ test("confirmAll uses snapshot only and keeps new due items pending", async () =
     await new Promise((resolve) => setImmediate(resolve))
   }
 
-  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T09:05:00+08:00"))
+  await coordinator.onScheduleDue(schedule3040, new Date("2026-04-07T10:05:00+08:00"))
   const pendingDuringRun = await pendingStore.list()
   assert.equal(pendingDuringRun.length, 2)
   assert.equal(pendingDuringRun[0].status, "running")
@@ -173,3 +173,4 @@ test("confirmAll uses snapshot only and keeps new due items pending", async () =
   assert.equal(finalItems[1].status, "pending")
   assert.ok(popupPublisher.calls >= 3)
 })
+

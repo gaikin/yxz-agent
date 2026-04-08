@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { PopupExecutionStore } from "../frontend/popup/stores/popupExecutionStore"
-import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../types/appProtocol"
+import { PopupExecutionStore } from "../webapp/src/popup/popupExecutionStore"
+import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../types/frontendProtocol"
 
 function overviewEvent(pendingCount: number): PopupScheduleExecutionOverviewUpdatedEvent {
   return {
@@ -70,5 +70,14 @@ test("popup store reopens as pending after executing state receives new pending 
   assert.equal(state.mode, "pending")
   assert.equal(state.overview?.pendingCount, 2)
   assert.deepEqual(state.executingIds, [])
+})
+
+test("popup store can hydrate initial overview from page init data", () => {
+  const store = new PopupExecutionStore()
+  store.hydrateOverview(overviewEvent(1).overview)
+
+  const state = store.getState()
+  assert.equal(state.mode, "pending")
+  assert.equal(state.overview?.pendingCount, 1)
 })
 

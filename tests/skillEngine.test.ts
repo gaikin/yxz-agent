@@ -1,10 +1,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { SkillEngine } from "../dcf-subprocess/skills/skillEngine"
-import { DefaultToolExecutor } from "../dcf-subprocess/execution/toolExecutor"
-import { ToolHandlerRegistry } from "../dcf-subprocess/execution/toolHandlerRegistry"
-import { query3040TodaySkill } from "../dcf-subprocess/skills/query3040Today"
-import { ToolExecutionError } from "../dcf-subprocess/execution/toolExecutionError"
+import { SkillEngine } from "../dcf/skills/skillEngine"
+import { DefaultToolExecutor } from "../dcf/execution/toolExecutor"
+import { ToolHandlerRegistry } from "../dcf/execution/toolHandlerRegistry"
+import { query3040TodaySkill } from "../dcf/skills/query3040Today"
+import { ToolExecutionError } from "../dcf/execution/toolExecutionError"
 
 test("skill engine returns the last tool result on success", async () => {
   const registry = new ToolHandlerRegistry()
@@ -59,4 +59,5 @@ test("skill engine maps tool failures to failed result", async () => {
     },
   })
 })
+
 

@@ -1,4 +1,4 @@
-import type { DcfBootstrapRuntimeState } from "../../shared/protocol"
+import type { DcfBootstrapRuntimeState } from "../../types/appProtocol"
 
 export class RuntimeState {
   private state: DcfBootstrapRuntimeState = {

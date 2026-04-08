@@ -7,7 +7,7 @@ import type {
   FrontendScheduleEnabledEvent,
   FrontendScheduleStateSnapshotEvent,
   ScheduleSummary,
-} from "../../shared/protocol"
+} from "../../types/appProtocol"
 
 export interface ScheduleStoreState {
   automationAuthorization: AutomationAuthorizationState

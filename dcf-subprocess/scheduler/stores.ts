@@ -4,7 +4,7 @@ import type {
   ScheduleExecutionOverview,
   SchedulePendingExecutionItem,
   SchedulePendingExecutionStatus,
-} from "../../shared/protocol"
+} from "../../types/appProtocol"
 import type { ScheduleDefinition, ScheduleRunRecord, ScheduleRuntimeState } from "./types"
 
 type RuntimeMap = Record<string, ScheduleRuntimeState>

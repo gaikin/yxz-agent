@@ -1,4 +1,4 @@
-import type { ScheduleExecutionOverview } from "../../shared/protocol"
+import type { ScheduleExecutionOverview } from "../../types/appProtocol"
 
 export interface PendingExecutionNotifier {
   notify(overview: ScheduleExecutionOverview): Promise<void>

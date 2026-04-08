@@ -1,4 +1,4 @@
-import type { PopupToDcfEvent } from "../../shared/protocol"
+import type { PopupToDcfEvent } from "../../types/appProtocol"
 import { PopupEventHandlerRegistry } from "./handlerFramework"
 
 export class PopupChannelServer {

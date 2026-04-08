@@ -4,7 +4,7 @@ import type {
   FrontendScheduleDisableEvent,
   FrontendScheduleEnableEvent,
   FrontendScheduleStateEvent,
-} from "../../shared/protocol"
+} from "../../types/appProtocol"
 
 type WindowIdMap = Record<string, string>
 

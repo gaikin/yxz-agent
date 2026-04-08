@@ -1,7 +1,7 @@
 import type {
   PopupConfirmAllScheduleExecutionsEvent,
   PopupDismissAllScheduleExecutionsEvent,
-} from "../../shared/protocol"
+} from "../../types/appProtocol"
 import { PopupEventHandler, ControllerAbstract, type SocketServerLike } from "./handlerFramework"
 import { ScheduleExecutionCoordinator } from "../scheduler/scheduleExecutionCoordinator"
 import { ScheduleLoader } from "../scheduler/stores"

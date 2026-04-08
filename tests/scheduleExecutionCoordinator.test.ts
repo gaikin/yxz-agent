@@ -13,7 +13,7 @@ import type {
   ScheduleDefinition,
 } from "../dcf-subprocess/scheduler/types"
 import type { SkillExecutionResult } from "../dcf-subprocess/skills/types"
-import type { ScheduleExecutionOverview } from "../shared/protocol"
+import type { ScheduleExecutionOverview } from "../types/appProtocol"
 import type { RumJsCacheApi } from "../dcf-subprocess/common/rumJsJsonStore"
 
 class MemoryPopupPublisher implements PopupEventPublisher, PendingExecutionNotifier {

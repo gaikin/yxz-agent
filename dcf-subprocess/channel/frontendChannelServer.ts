@@ -1,4 +1,4 @@
-import type { FrontendToDcfEvent } from "../../shared/protocol"
+import type { FrontendToDcfEvent } from "../../types/appProtocol"
 import { FrontendEventHandlerRegistry } from "./handlerFramework"
 
 export class FrontendChannelServer {

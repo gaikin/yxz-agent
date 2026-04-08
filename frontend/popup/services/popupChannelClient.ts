@@ -2,7 +2,7 @@ import type {
   DcfToPopupEvent,
   PopupConfirmAllScheduleExecutionsEvent,
   PopupDismissAllScheduleExecutionsEvent,
-} from "../../../shared/protocol"
+} from "../../../types/appProtocol"
 
 type WindowIdMap = Record<string, string>
 

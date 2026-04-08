@@ -1,4 +1,4 @@
-import type { AutomationAuthorizationState, ScheduleExecutionStatus, SchedulePendingExecutionItem } from "../../shared/protocol"
+import type { AutomationAuthorizationState, ScheduleExecutionStatus, SchedulePendingExecutionItem } from "../../types/appProtocol"
 import type { SkillExecutionResult } from "../skills/types"
 
 export interface ScheduleDefinition {
@@ -45,7 +45,7 @@ export interface PopupEventPublisher {
 }
 
 export interface PendingExecutionNotifier {
-  notify(overview: import("../../shared/protocol").ScheduleExecutionOverview): Promise<void>
+  notify(overview: import("../../types/appProtocol").ScheduleExecutionOverview): Promise<void>
 }
 
 export interface FrontendEventPublisher {

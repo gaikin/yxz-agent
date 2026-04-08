@@ -1,4 +1,4 @@
-import type { FrontendToDcfEvent, PopupToDcfEvent } from "../../shared/protocol"
+import type { FrontendToDcfEvent, PopupToDcfEvent } from "../../types/appProtocol"
 
 const frontendHandlerMetadata = new WeakMap<object, Array<{ eventType: string; propertyKey: string }>>()
 const popupHandlerMetadata = new WeakMap<object, Array<{ eventType: string; propertyKey: string }>>()

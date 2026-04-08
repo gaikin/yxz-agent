@@ -4,7 +4,7 @@ import type {
   FrontendScheduleEnableEvent,
   FrontendScheduleStateEvent,
   FrontendToDcfEvent,
-} from "../../shared/protocol"
+} from "../../types/appProtocol"
 import { FrontendEventHandler, ControllerAbstract, type SocketServerLike } from "./handlerFramework"
 import { AutomationAuthorizationStore, ScheduleLoader, ScheduleRuntimeStore } from "../scheduler/stores"
 import { ScheduleExecutionCoordinator } from "../scheduler/scheduleExecutionCoordinator"

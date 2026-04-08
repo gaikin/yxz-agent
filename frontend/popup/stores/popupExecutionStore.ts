@@ -1,4 +1,4 @@
-import type { PopupScheduleExecutionOverviewUpdatedEvent, ScheduleExecutionOverview, SchedulePendingExecutionItem } from "../../../shared/protocol"
+import type { PopupScheduleExecutionOverviewUpdatedEvent, ScheduleExecutionOverview, SchedulePendingExecutionItem } from "../../../types/appProtocol"
 
 export type PopupExecutionMode = "hidden" | "pending" | "executing"
 

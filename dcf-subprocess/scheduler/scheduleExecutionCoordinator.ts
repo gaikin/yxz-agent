@@ -1,4 +1,4 @@
-import type { SchedulePendingExecutionItem } from "../../shared/protocol"
+import type { SchedulePendingExecutionItem } from "../../types/appProtocol"
 import { createId } from "../common/id"
 import { SchedulePendingExecutionStore, ScheduleRunRecordStore, ScheduleRuntimeStore } from "./stores"
 import type { FrontendEventPublisher, PendingExecutionNotifier, ScheduleDefinition } from "./types"

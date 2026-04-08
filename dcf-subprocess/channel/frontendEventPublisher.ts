@@ -5,7 +5,7 @@ import type {
   FrontendScheduleStateSnapshotEvent,
   FrontendScheduleDisabledEvent,
   FrontendScheduleEnabledEvent,
-} from "../../shared/protocol"
+} from "../../types/appProtocol"
 import type { RuntimeState } from "../runtime/runtimeState"
 import type { FrontendEventPublisher as FrontendEventPublisherContract } from "../scheduler/types"
 import { ScheduleLoader, ScheduleRuntimeStore, type AutomationAuthorizationStore } from "../scheduler/stores"

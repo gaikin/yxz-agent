@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { PopupExecutionStore } from "../frontend/popup/stores/popupExecutionStore"
-import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../shared/protocol"
+import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../types/appProtocol"
 
 function overviewEvent(pendingCount: number): PopupScheduleExecutionOverviewUpdatedEvent {
   return {

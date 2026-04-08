@@ -1,4 +1,4 @@
-import type { DcfToFrontendEvent } from "../../shared/protocol"
+import type { DcfToFrontendEvent } from "../../types/appProtocol"
 import { AssistantWindowChannelClient } from "../services/assistantWindowChannelClient"
 import { EventDispatcher } from "../services/eventDispatcher"
 import { ScheduleStore } from "../stores/scheduleStore"

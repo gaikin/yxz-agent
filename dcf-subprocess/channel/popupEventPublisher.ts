@@ -1,4 +1,4 @@
-import type { DcfToPopupEvent, PopupScheduleExecutionOverviewUpdatedEvent } from "../../shared/protocol"
+import type { DcfToPopupEvent, PopupScheduleExecutionOverviewUpdatedEvent } from "../../types/appProtocol"
 import { SchedulePendingExecutionStore } from "../scheduler/stores"
 import type { PendingExecutionNotifier } from "./pendingExecutionNotifier"
 import type { PopupEventPublisher as PopupEventPublisherContract } from "../scheduler/types"
@@ -25,7 +25,7 @@ export class PopupEventPublisher implements PopupEventPublisherContract, Pending
     await this.sink.publish(event)
   }
 
-  async notify(overview: import("../../shared/protocol").ScheduleExecutionOverview): Promise<void> {
+  async notify(overview: import("../../types/appProtocol").ScheduleExecutionOverview): Promise<void> {
     const event: PopupScheduleExecutionOverviewUpdatedEvent = {
       type: "SCHEDULE_EXECUTION_OVERVIEW_UPDATED",
       deviceId: this.deviceId,

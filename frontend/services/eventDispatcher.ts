@@ -1,4 +1,4 @@
-import type { DcfToFrontendEvent } from "../../shared/protocol"
+import type { DcfToFrontendEvent } from "../../types/appProtocol"
 import { ScheduleStore } from "../stores/scheduleStore"
 
 export class EventDispatcher {

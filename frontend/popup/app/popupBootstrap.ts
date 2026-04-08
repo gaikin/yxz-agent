@@ -1,4 +1,4 @@
-import type { DcfToPopupEvent } from "../../../shared/protocol"
+import type { DcfToPopupEvent } from "../../../types/appProtocol"
 import { PopupChannelClient } from "../services/popupChannelClient"
 import { PopupEventDispatcher } from "../services/popupEventDispatcher"
 import { PopupExecutionStore } from "../stores/popupExecutionStore"

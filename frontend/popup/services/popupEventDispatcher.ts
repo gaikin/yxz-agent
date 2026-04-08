@@ -1,4 +1,4 @@
-import type { DcfToPopupEvent } from "../../../shared/protocol"
+import type { DcfToPopupEvent } from "../../../types/appProtocol"
 import { PopupExecutionStore } from "../stores/popupExecutionStore"
 
 export class PopupEventDispatcher {

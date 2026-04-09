@@ -8,43 +8,48 @@
 
 ## 可直接使用的接入入口
 
-- `createAssistantRuntime`
-- `createPopupRuntime`
+- `AssistantWindowPage`
+- `PopupPageService`
 - `YxzExtensionService`
 
 主要代码位置：
 
-- `service/YxzExtensionService.ts`
-- `webapp/src/assistant`
-- `webapp/src/popup`
-- `webapp/src/react`
+- `subprocess/service/YxzExtensionService.ts`
+- `webapp/src/Assistant/index.tsx`
+- `webapp/src/Popup/index.tsx`
+- `webapp/src/Popup`
 
 现成 React 弹窗组件：
 
 - `ScheduleConfirmationPopup`
-- `usePopupRuntimeViewModel`
-- `getPopupRuntimeFromHost`
+- `getPopupPageServiceFromHost`
+- `AssistantWindowPage`
 
 主动触发 DCF 事件时默认使用：
 
-- `window.socket.sendRequest(... target: "yxzExt")`
+- `window.BridgeJs.sendToWindow(windowId, channel, JSON.stringify(event))`
 
 ## React 侧建议接法
 
-`createAssistantRuntime()` 和 `createPopupRuntime()` 都提供了：
-
-- `subscribe(listener)`
-- `getViewModel()`
-
-这两个方法可以直接配合 `useSyncExternalStore` 使用。
+`AssistantWindowPage` 和 `PopupPageService` 负责把页面流程过程化，组件直接调用页面内逻辑获取和推进状态。
 
 示例：
 
 ```tsx
-import { ScheduleConfirmationPopup } from "../webapp/src/react/ScheduleConfirmationPopup"
+import { ScheduleConfirmationPopup } from "../webapp/src/Popup/ScheduleConfirmationPopup"
 
 export function SchedulePopup() {
   return <ScheduleConfirmationPopup />
+}
+```
+
+assistant 页面也可以直接使用：
+
+```tsx
+import { AssistantWindowPage } from "../webapp/src/Assistant"
+
+export function AssistantPage() {
+  return <AssistantWindowPage />
 }
 ```
 
@@ -59,12 +64,13 @@ export function SchedulePopup() {
 
 ## 行为链路
 
-1. React UI 调用 assistant runtime 完成授权和启用定时任务
+1. React UI 调用 assistant page service 完成授权和启用定时任务
 2. popup 页面通过 `window.BridgeJS.getPageInitData()` 读取初始化数据
 3. DCF 调度器在北京时间 `10:00` 创建待执行项
 4. service 通过 `openYxzWinByOptions({ pageInitParam })` 打开弹窗
-5. popup runtime 从 `pageInitParam` 恢复初始 overview
+5. popup page service 从 `pageInitParam` 恢复初始 overview
 6. React UI 弹出确认框
 7. 用户点击确认
-8. popup runtime 发送 `CONFIRM_ALL_SCHEDULE_EXECUTIONS`
+8. popup page service 发送 `CONFIRM_ALL_SCHEDULE_EXECUTIONS`
 9. DCF 执行 `query_3040_today` skill
+

@@ -13,8 +13,7 @@ xx.init()
 ## 主进程初始化
 
 ```ts
-import { YxzExtensionService } from "./service/YxzExtensionService"
-import { rumJsCache } from "./globalRumJsCache"
+import { YxzExtensionService } from "./subprocess/service/YxzExtensionService"
 import { socketServer } from "./hostSocketServer"
 
 export async function bootstrapHost() {
@@ -22,7 +21,6 @@ export async function bootstrapHost() {
 
   const yxzService = new YxzExtensionService(socketServer, {
     workspaceRoot: process.cwd(),
-    rumJsCache,
   })
 
   await yxzService.init()
@@ -37,17 +35,24 @@ service 类符合宿主模式：
 - 使用 `@requestEvent(url)` 标记宿主路由方法
 - 初始化后调用 `init()`
 
-如果宿主里暂时还没有正式的 `rumJsCache`，可以先不传，runtime 会自动退回到内存缓存。
+如果宿主里暂时还没有正式的 `rumJsCache`，可以先不传，runtime 会自动退回到带 demo 数据的内存缓存。
 
 如果宿主里暂时还没有自定义的 `toolTransport`，也可以先不传。
 runtime 会默认使用：
 
 - MCP endpoint：`http://127.0.0.1:26666/mcp`
 
-也可以显式传一个内存实现：
+也可以显式传一个内存 demo 实现：
 
 ```ts
-import { createMemoryRumJsCache } from "./dcf/common/rumJsJsonStore"
+import { createDemoRumJsCache } from "./subprocess/service/common/demoRuntimeData"
+
+const rumJsCache = createDemoRumJsCache({
+  automationAuthorization: {
+    authorized: true,
+    authorizedAt: "2026-04-08 09:00:00",
+  },
+})
 ```
 
 如果你们宿主有自己的 MCP 调用通道，再显式传自定义 `toolTransport`：
@@ -89,29 +94,16 @@ window.BridgeJS.getPageInitData()
 - `dcfWindowId`
 - `overview`
 
-其他页面如果要主动触发事件，优先走：
+其他页面如果要主动触发事件，统一走 Bridge 事件：
 
 ```ts
-window.socket.sendRequest<boolean>({
-  url: "/yxz/frontend/event",
-  options: [event],
-  target: "yxzExt",
-})
+window.BridgeJs.sendToWindow(windowId, "assistant_window", JSON.stringify(event))
 ```
 
-service 路由方法示意：
+DCF 向页面推送状态时，宿主可以直接用：
 
 ```ts
-export class YxzExtensionService extends ControllerAbstract {
-  async init() {
-    // 初始化 runtime
-  }
-
-  @requestEvent("/yxz/frontend/event")
-  async handleFrontendEvent(event) {
-    return true
-  }
-}
+sendEventByWinId(winId, "assistant_window", JSON.stringify(event))
 ```
 
 定时任务到点后的建议链路：
@@ -161,7 +153,7 @@ const yxzService = new YxzExtensionService(socketServer, {
 ## 迁移顺序
 
 1. 在 `xx.init()` 后初始化 `YxzExtensionService`
-2. 打通 `frontendSink` 和 `popupSink`
+2. 打通 `sendEventByWinId -> listen(channel)` 事件链路
 3. 在 React 根组件挂载 `ScheduleConfirmationPopup`
 4. 完成授权并启用 `schedule_3040_daily`
 5. 验证北京时间每天 `10:00` 出现确认弹窗

@@ -1,21 +1,20 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
-  createAssistantRuntime,
-} from "../webapp/src/assistant/assistantRuntime"
-import { createPopupRuntime } from "../webapp/src/popup/popupRuntime"
+  AssistantWindowPage,
+  AssistantWindowService,
+} from "../webapp/src/pages/Assistant"
 import {
-  getPopupRuntimeFromHost,
+  PopupPageService,
+  getPopupPageServiceFromHost,
   ScheduleConfirmationPopup,
-} from "../webapp/src/react"
+} from "../webapp/src/pages/Popup"
 import {
-  YXZ_EXTENSION_TARGET,
-  YXZ_FRONTEND_EVENT_URL,
-  YXZ_POPUP_EVENT_URL,
-} from "../shared/hostRoutes"
-import { YxzExtensionService } from "../service/YxzExtensionService"
-import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../types/frontendProtocol"
-import type { RumJsCacheApi } from "../dcf/common/rumJsJsonStore"
+  DcfRuntimeService,
+  initializeDcfRuntime,
+} from "../subprocess/service/DcfRuntimeService"
+import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../share/protocol"
+import type { RumJsCacheApi } from "../subprocess/service/common/rumJsJsonStore"
 
 class MemoryRumJsCache implements RumJsCacheApi {
   private readonly map = new Map<string, string>()
@@ -70,13 +69,13 @@ function installFakeBridge() {
   }
 }
 
-test("assistant runtime exposes subscribe/getViewModel for react ui", () => {
+test("assistant window service exposes subscribe/getViewModel for react ui", () => {
   const { fakeBridge, restore } = installFakeBridge()
 
   try {
-    const runtime = createAssistantRuntime("device-001")
+    const service = new AssistantWindowService("device-001")
     let notifications = 0
-    const unsubscribe = runtime.subscribe(() => {
+    const unsubscribe = service.subscribe(() => {
       notifications += 1
     })
 
@@ -96,7 +95,7 @@ test("assistant runtime exposes subscribe/getViewModel for react ui", () => {
     })
 
     assert.equal(notifications, 1)
-    assert.equal(runtime.getViewModel().shouldShowAutomationAuthorization, true)
+    assert.equal(service.getViewModel().shouldShowAutomationAuthorization, true)
 
     unsubscribe()
   } finally {
@@ -104,11 +103,11 @@ test("assistant runtime exposes subscribe/getViewModel for react ui", () => {
   }
 })
 
-test("popup runtime exposes imperative getViewModel flow for react ui", async () => {
+test("popup page service exposes imperative getViewModel flow for react ui", async () => {
   const { fakeBridge, restore } = installFakeBridge()
 
   try {
-    const runtime = createPopupRuntime("device-001")
+    const service = new PopupPageService({ deviceId: "device-001" })
 
     const event: PopupScheduleExecutionOverviewUpdatedEvent = {
       type: "SCHEDULE_EXECUTION_OVERVIEW_UPDATED",
@@ -133,8 +132,8 @@ test("popup runtime exposes imperative getViewModel flow for react ui", async ()
       data: [JSON.stringify(event)],
     })
 
-    assert.equal(runtime.getViewModel().mode, "pending")
-    const nextViewModel = await runtime.dismissAll()
+    assert.equal(service.getViewModel().mode, "pending")
+    const nextViewModel = await service.dismissAll()
     assert.equal(nextViewModel.mode, "hidden")
   } finally {
     restore()
@@ -143,9 +142,10 @@ test("popup runtime exposes imperative getViewModel flow for react ui", async ()
 
 test("react popup exports are available for direct integration", () => {
   assert.equal(typeof ScheduleConfirmationPopup, "function")
+  assert.equal(typeof AssistantWindowPage, "function")
 })
 
-test("host popup runtime reads deviceId from BridgeJS page init data", async () => {
+test("host popup page service reads deviceId from BridgeJS page init data", async () => {
   const { fakeBridge, restore } = installFakeBridge()
 
   try {
@@ -167,10 +167,10 @@ test("host popup runtime reads deviceId from BridgeJS page init data", async () 
       },
     }
 
-    const runtime = await getPopupRuntimeFromHost()
-    assert.equal(runtime.getViewModel().mode, "pending")
+    const service = await getPopupPageServiceFromHost()
+    assert.equal(service.getViewModel().mode, "pending")
 
-    await runtime.confirmAll()
+    await service.confirmAll()
 
     assert.equal(fakeBridge.sentMessages.length, 1)
     assert.equal(fakeBridge.sentMessages[0].windowId, "dcf-window-from-page-init")
@@ -185,7 +185,7 @@ test("host popup runtime reads deviceId from BridgeJS page init data", async () 
   }
 })
 
-test("popup runtime prefers global socket requests when available", async () => {
+test("popup page service sends popup events through BridgeJs channel", async () => {
   const { fakeBridge, restore } = installFakeBridge()
 
   try {
@@ -193,16 +193,8 @@ test("popup runtime prefers global socket requests when available", async () => 
       deviceId: "device-from-socket",
     }
 
-    const socketCalls: Array<{ url: string; options?: unknown[]; target: string }> = []
-    ;(globalThis as Record<string, unknown>).socket = {
-      async sendRequest<T>(request: { url: string; options?: unknown[]; target: string }) {
-        socketCalls.push(request)
-        return true as T
-      },
-    }
-
-    const runtime = createPopupRuntime("device-from-socket")
-    runtime.getViewModel()
+    const service = new PopupPageService({ deviceId: "device-from-socket" })
+    service.getViewModel()
 
     fakeBridge.listeners.get("schedule_popup")?.({
       data: [
@@ -227,43 +219,51 @@ test("popup runtime prefers global socket requests when available", async () => 
       ],
     })
 
-    await runtime.confirmAll()
+    await service.confirmAll()
 
-    assert.equal(socketCalls.length, 1)
-    assert.equal(socketCalls[0].url, YXZ_POPUP_EVENT_URL)
-    assert.equal(socketCalls[0].target, YXZ_EXTENSION_TARGET)
-    assert.equal((socketCalls[0].options?.[0] as { type: string }).type, "CONFIRM_ALL_SCHEDULE_EXECUTIONS")
-    assert.equal(fakeBridge.sentMessages.length, 0)
+    assert.equal(fakeBridge.sentMessages.length, 1)
+    assert.equal(fakeBridge.sentMessages[0].channel, "schedule_popup")
+    assert.equal(
+      JSON.parse(fakeBridge.sentMessages[0].data).type,
+      "CONFIRM_ALL_SCHEDULE_EXECUTIONS"
+    )
   } finally {
     restore()
   }
 })
 
-test("assistant runtime prefers global socket requests when available", async () => {
-  const { restore } = installFakeBridge()
+test("assistant window service sends authorization event through BridgeJs channel", async () => {
+  const { fakeBridge, restore } = installFakeBridge()
 
   try {
-    const socketCalls: Array<{ url: string; options?: unknown[]; target: string }> = []
-    ;(globalThis as Record<string, unknown>).socket = {
-      async sendRequest<T>(request: { url: string; options?: unknown[]; target: string }) {
-        socketCalls.push(request)
-        return true as T
-      },
-    }
+    const service = new AssistantWindowService("device-assistant")
+    await service.confirmAutomationAuthorization()
 
-    const runtime = createAssistantRuntime("device-assistant")
-    await runtime.confirmAutomationAuthorization()
-
-    assert.equal(socketCalls.length, 1)
-    assert.equal(socketCalls[0].url, YXZ_FRONTEND_EVENT_URL)
-    assert.equal(socketCalls[0].target, YXZ_EXTENSION_TARGET)
-    assert.equal((socketCalls[0].options?.[0] as { type: string }).type, "AUTHORIZE_AUTOMATION")
+    assert.equal(fakeBridge.sentMessages.length, 1)
+    assert.equal(fakeBridge.sentMessages[0].channel, "assistant_window")
+    assert.equal(JSON.parse(fakeBridge.sentMessages[0].data).type, "AUTHORIZE_AUTOMATION")
   } finally {
     restore()
   }
 })
 
-test("yxz extension service initializes and forwards events", async () => {
+test("assistant window service can trigger current schedule through BridgeJs channel", async () => {
+  const { fakeBridge, restore } = installFakeBridge()
+
+  try {
+    const service = new AssistantWindowService("device-assistant")
+    await service.triggerCurrentScheduleNow()
+
+    assert.equal(fakeBridge.sentMessages.length, 1)
+    assert.equal(fakeBridge.sentMessages[0].channel, "assistant_window")
+    assert.equal(JSON.parse(fakeBridge.sentMessages[0].data).type, "TRIGGER_SCHEDULE")
+    assert.equal(JSON.parse(fakeBridge.sentMessages[0].data).scheduleId, "schedule_3040_daily")
+  } finally {
+    restore()
+  }
+})
+
+test("dcf runtime service initializes and handles request-event actions", async () => {
   const openedWindows: Array<{
     x: number
     y: number
@@ -274,17 +274,13 @@ test("yxz extension service initializes and forwards events", async () => {
     hash: string
     name: string
   }> = []
-  const service = new YxzExtensionService(
+  const service = new DcfRuntimeService(
     {},
     {
       workspaceRoot: process.cwd(),
       deviceId: "device-service",
-      frontendSink: {
-        async publish() {},
-      },
-      popupSink: {
-        async publish() {},
-      },
+      publishFrontendEvent: async () => {},
+      publishPopupEvent: async () => {},
       toolTransport: {
         async send() {
           return { result: { content: [{ type: "text", text: "{}" }] } }
@@ -309,11 +305,7 @@ test("yxz extension service initializes and forwards events", async () => {
 
   await service.init()
 
-  assert.equal(await service.handleFrontendEvent({
-    type: "SCHEDULE_STATE",
-    deviceId: "device-001",
-    sentAt: new Date().toISOString(),
-  }), true)
+  assert.equal(await service.requestScheduleState("device-001"), true)
 
   assert.equal(await service.triggerSchedule("schedule_3040_daily"), true)
   assert.equal(openedWindows.length, 1)
@@ -331,4 +323,79 @@ test("yxz extension service initializes and forwards events", async () => {
   assert.equal(pageInitData.deviceId, "device-service")
   assert.equal(pageInitData.overview.pendingCount, 1)
 })
+
+test("initializeDcfRuntime extracts service initialization flow", async () => {
+  const openedOverviews: Array<{ pendingCount: number }> = []
+
+  const runtime = await initializeDcfRuntime(
+    {
+      workspaceRoot: process.cwd(),
+      deviceId: "device-helper",
+      publishFrontendEvent: async () => {},
+      publishPopupEvent: async () => {},
+      toolTransport: {
+        async send() {
+          return { result: { content: [{ type: "text", text: "{}" }] } }
+        },
+      },
+    },
+    {
+      openPendingOverview: async (overview) => {
+        openedOverviews.push({ pendingCount: overview.pendingCount })
+      },
+    }
+  )
+
+  await runtime.scheduleTimerService.trigger(
+    {
+      scheduleId: "schedule_3040_daily",
+      name: "3040每日查询",
+      cronExpression: "0 0 10 * * *",
+      timezone: "Asia/Shanghai",
+      skillId: "query_3040_today",
+    },
+    new Date("2026-04-09T10:00:00+08:00")
+  )
+
+  assert.equal(openedOverviews.length, 1)
+  assert.equal(openedOverviews[0].pendingCount, 1)
+})
+
+test("initializeDcfRuntime can publish events through sendEventByWinId bridge", async () => {
+  const sentEvents: Array<{ winId: string; channel: string; data: string }> = []
+
+  const runtime = await initializeDcfRuntime({
+    workspaceRoot: process.cwd(),
+    deviceId: "device-bridge",
+    frontendWindowId: "assistant-win-id",
+    popupWindowId: "popup-win-id",
+    windowEventBridge: {
+      async sendEventByWinId(winId, channel, data) {
+        sentEvents.push({ winId, channel, data })
+      },
+    },
+    toolTransport: {
+      async send() {
+        return { result: { content: [{ type: "text", text: "{}" }] } }
+      },
+    },
+  })
+
+  await runtime.frontendChannelService.publishBootstrapState()
+  await runtime.popupChannelService.notify({
+    pendingCount: 1,
+    items: [],
+    updatedAt: "2026-04-09 10:00:00",
+  })
+
+  assert.equal(sentEvents.length, 2)
+  assert.equal(sentEvents[0].winId, "assistant-win-id")
+  assert.equal(sentEvents[0].channel, "assistant_window")
+  assert.equal(JSON.parse(sentEvents[0].data).type, "BOOTSTRAP_STATE")
+  assert.equal(sentEvents[1].winId, "popup-win-id")
+  assert.equal(sentEvents[1].channel, "schedule_popup")
+  assert.equal(JSON.parse(sentEvents[1].data).type, "SCHEDULE_EXECUTION_OVERVIEW_UPDATED")
+})
+
+
 

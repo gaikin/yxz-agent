@@ -1,0 +1,12 @@
+{
+  "schedules": [
+    {
+      "scheduleId": "schedule_demo_every_minute",
+      "name": "演示定时任务",
+      "cronExpression": "0 * * * * *",
+      "timezone": "Asia/Shanghai",
+      "skillFile": "subprocess/schedule/examples/skills/query_3040_today.json",
+      "enabled": true
+    }
+  ]
+}

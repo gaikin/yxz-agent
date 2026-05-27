@@ -1,0 +1,12 @@
+{
+  "schedules": [
+    {
+      "scheduleId": "schedule_demo_1779263371882",
+      "name": "本地定时任务Demo(10秒后触发)",
+      "cronExpression": "*/10 * * * * *",
+      "timezone": "Asia/Shanghai",
+      "skillFile": "subprocess/schedule/examples/skills/query_3040_today.json",
+      "enabled": true
+    }
+  ]
+}

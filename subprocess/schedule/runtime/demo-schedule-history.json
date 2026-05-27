@@ -1,0 +1,70 @@
+[
+  {
+    "scheduleId": "schedule_demo_1779263371882",
+    "scheduleName": "本地定时任务Demo(10秒后触发)",
+    "triggeredAt": "2026-05-20 15:49:40",
+    "completedAt": "2026-05-20 15:49:40",
+    "status": "completed",
+    "result": {
+      "scheduleId": "schedule_demo_1779263371882",
+      "skillId": "query_3040_today",
+      "dueAt": "2026-05-20T07:49:40.000Z",
+      "result": {
+        "status": "completed",
+        "data": {
+          "ok": true,
+          "tabId": "tab_3040_001",
+          "results": [
+            {
+              "componentId": "btn_query_1",
+              "command": "click",
+              "status": "success",
+              "message": "mock executed"
+            }
+          ]
+        },
+        "steps": [
+          {
+            "stepId": "open_menu",
+            "action": "openMenu",
+            "params": {
+              "menuShortCode": "3040"
+            },
+            "status": "completed",
+            "result": {
+              "tabId": "tab_3040_001",
+              "menuShortCode": "3040",
+              "openedAt": "2026-05-20T07:49:40.125Z"
+            }
+          },
+          {
+            "stepId": "execute_query",
+            "action": "executePageCommands",
+            "params": {
+              "tabId": "tab_3040_001",
+              "commands": [
+                {
+                  "componentId": "btn_query_1",
+                  "command": "click"
+                }
+              ]
+            },
+            "status": "completed",
+            "result": {
+              "ok": true,
+              "tabId": "tab_3040_001",
+              "results": [
+                {
+                  "componentId": "btn_query_1",
+                  "command": "click",
+                  "status": "success",
+                  "message": "mock executed"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+]

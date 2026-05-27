@@ -1,0 +1,30 @@
+{
+  "skillId": "query_3040_today",
+  "name": "3040当日查询",
+  "description": "打开3040并点击查询",
+  "version": 1,
+  "steps": [
+    {
+      "stepId": "open_menu",
+      "action": "openMenu",
+      "params": {
+        "menuShortCode": "3040"
+      },
+      "saveAs": "tabInfo"
+    },
+    {
+      "stepId": "execute_query",
+      "action": "executePageCommands",
+      "params": {
+        "tabIdFrom": "tabInfo.tabId",
+        "commands": [
+          {
+            "componentId": "btn_query_1",
+            "command": "click"
+          }
+        ]
+      },
+      "saveAs": "queryResult"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/dev/projects/work/yxz-agent/**)",
+      "Bash(npx tsx:*)",
+      "Bash(node -e \"console.log\\(require\\(''axios/package.json''\\).version\\)\")"
+    ]
+  }
+}

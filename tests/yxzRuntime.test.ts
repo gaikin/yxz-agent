@@ -285,6 +285,7 @@ test("dcf runtime service initializes and handles request-event actions", async 
         async send() {
           return { result: { content: [{ type: "text", text: "{}" }] } }
         },
+        close() {},
       },
       windowService: {
         async openYxzWinByOptions(options) {
@@ -322,6 +323,7 @@ test("dcf runtime service initializes and handles request-event actions", async 
   }
   assert.equal(pageInitData.deviceId, "device-service")
   assert.equal(pageInitData.overview.pendingCount, 1)
+  await service.getInternalRuntime().scheduleTimerService.stop()
 })
 
 test("initializeDcfRuntime extracts service initialization flow", async () => {
@@ -337,6 +339,7 @@ test("initializeDcfRuntime extracts service initialization flow", async () => {
         async send() {
           return { result: { content: [{ type: "text", text: "{}" }] } }
         },
+        close() {},
       },
     },
     {
@@ -359,6 +362,7 @@ test("initializeDcfRuntime extracts service initialization flow", async () => {
 
   assert.equal(openedOverviews.length, 1)
   assert.equal(openedOverviews[0].pendingCount, 1)
+  await runtime.scheduleTimerService.stop()
 })
 
 test("initializeDcfRuntime can publish events through sendEventByWinId bridge", async () => {
@@ -378,6 +382,7 @@ test("initializeDcfRuntime can publish events through sendEventByWinId bridge", 
       async send() {
         return { result: { content: [{ type: "text", text: "{}" }] } }
       },
+      close() {},
     },
   })
 
@@ -395,6 +400,7 @@ test("initializeDcfRuntime can publish events through sendEventByWinId bridge", 
   assert.equal(sentEvents[1].winId, "popup-win-id")
   assert.equal(sentEvents[1].channel, "schedule_popup")
   assert.equal(JSON.parse(sentEvents[1].data).type, "SCHEDULE_EXECUTION_OVERVIEW_UPDATED")
+  await runtime.scheduleTimerService.stop()
 })
 
 

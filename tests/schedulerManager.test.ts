@@ -1,7 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { SchedulerManager } from "../dcf/scheduler/schedulerManager"
-import type { ScheduleDefinition } from "../dcf/scheduler/types"
+import { formatDateTime } from "../share/dateTime"
+import { ScheduleTimerService } from "../subprocess/service/scheduler/SchedulerService"
+import type { ScheduleDefinition } from "../subprocess/service/scheduler/ScheduleStateService"
 
 const fastSchedule: ScheduleDefinition = {
   scheduleId: "schedule_fast",
@@ -14,9 +15,9 @@ const fastSchedule: ScheduleDefinition = {
 test("scheduler manager reschedules the next occurrence after a due run", async () => {
   const dueTimes: string[] = []
   const registeredTimes: string[] = []
-  const manager = new SchedulerManager(
+  const manager = new ScheduleTimerService(
     async (_schedule, requestedAt) => {
-      dueTimes.push(requestedAt.toISOString())
+      dueTimes.push(formatDateTime(requestedAt))
     },
     async (_schedule, nextTriggerAt) => {
       registeredTimes.push(nextTriggerAt)
@@ -35,4 +36,5 @@ test("scheduler manager reschedules the next occurrence after a due run", async 
 
   await manager.stop()
 })
+
 

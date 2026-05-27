@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { PopupExecutionStore } from "../webapp/src/popup/popupExecutionStore"
-import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../types/frontendProtocol"
+import { PopupExecutionStore } from "../webapp/src/pages/Popup"
+import type { PopupScheduleExecutionOverviewUpdatedEvent } from "../share/protocol"
 
 function overviewEvent(pendingCount: number): PopupScheduleExecutionOverviewUpdatedEvent {
   return {
@@ -80,4 +80,5 @@ test("popup store can hydrate initial overview from page init data", () => {
   assert.equal(state.mode, "pending")
   assert.equal(state.overview?.pendingCount, 1)
 })
+
 

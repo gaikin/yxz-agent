@@ -5,7 +5,11 @@
   "type": "commonjs",
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/tests/*.test.js"
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "demo:mcp": "node scripts/demo-mcp-tool.js",
+    "demo:skill": "npm run build && node scripts/run-local-skill.js",
+    "demo:schedule": "node scripts/demo-local-schedule.js",
+    "mock:mcp": "node subprocess/schedule/mock-mcp-server.js"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
@@ -14,6 +18,8 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "axios": "^1.15.0",
     "cron-parser": "^5.4.0"
   },
   "peerDependencies": {

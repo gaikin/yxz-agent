@@ -14,10 +14,9 @@
     "types": ["node"]
   },
   "include": [
-    "shared/**/*.ts",
+    "share/**/*.ts",
     "types/**/*.ts",
-    "service/**/*.ts",
-    "dcf/**/*.ts",
+    "subprocess/service/**/*.ts",
     "webapp/src/**/*.ts",
     "webapp/src/**/*.tsx",
     "tests/**/*.ts"

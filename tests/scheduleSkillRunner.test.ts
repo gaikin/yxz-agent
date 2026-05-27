@@ -1,13 +1,15 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { ScheduleSkillRunner } from "../dcf/scheduler/scheduleSkillRunner"
-import { ScheduleSkillRegistry } from "../dcf/scheduler/scheduleSkillRegistry"
-import { query3040TodaySkill } from "../dcf/skills/query3040Today"
+import {
+  ScheduleSkillCatalogService,
+  ScheduleSkillExecutionService,
+} from "../subprocess/service/scheduler/SchedulerService"
+import { query3040TodaySkill } from "../subprocess/service/SkillService"
 import type {
   JsonRpcToolCallRequest,
   JsonRpcToolTransport,
   JsonRpcToolTransportFactory,
-} from "../dcf/execution/mcpToolClient"
+} from "../subprocess/service/execution/mcpToolClient"
 
 class CountingTransport implements JsonRpcToolTransport {
   constructor(private readonly onSend: () => void) {}
@@ -20,11 +22,13 @@ class CountingTransport implements JsonRpcToolTransport {
       },
     }
   }
+
+  close(): void {}
 }
 
 test("schedule skill runner creates a fresh transport for each run", async () => {
-  const registry = new ScheduleSkillRegistry()
-  registry.register(query3040TodaySkill)
+  const skillCatalogService = new ScheduleSkillCatalogService()
+  skillCatalogService.register(query3040TodaySkill)
 
   let transportCreateCount = 0
   const sendCountsByTransport: number[] = []
@@ -39,12 +43,16 @@ test("schedule skill runner creates a fresh transport for each run", async () =>
     },
   }
 
-  const runner = new ScheduleSkillRunner(registry, transportFactory)
+  const executionService = new ScheduleSkillExecutionService(
+    skillCatalogService,
+    transportFactory
+  )
 
-  await runner.run("query_3040_today", new Date("2026-04-08T10:00:00+08:00"))
-  await runner.run("query_3040_today", new Date("2026-04-08T10:05:00+08:00"))
+  await executionService.run("query_3040_today", new Date("2026-04-08T10:00:00+08:00"))
+  await executionService.run("query_3040_today", new Date("2026-04-08T10:05:00+08:00"))
 
   assert.equal(transportCreateCount, 2)
   assert.deepEqual(sendCountsByTransport, [1, 1])
 })
+
 

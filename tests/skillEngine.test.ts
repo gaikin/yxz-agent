@@ -1,63 +1,104 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { SkillEngine } from "../dcf/skills/skillEngine"
-import { DefaultToolExecutor } from "../dcf/execution/toolExecutor"
-import { ToolHandlerRegistry } from "../dcf/execution/toolHandlerRegistry"
-import { query3040TodaySkill } from "../dcf/skills/query3040Today"
-import { ToolExecutionError } from "../dcf/execution/toolExecutionError"
+import {
+  DirectMcpSkillEngine,
+  query3040TodaySkill,
+} from "../subprocess/service/SkillService"
 
-test("skill engine returns the last tool result on success", async () => {
-  const registry = new ToolHandlerRegistry()
-  registry.register({
-    tool: "openMenu",
-    async execute() {
-      return { tabId: "tab_001" }
-    },
-  })
-  registry.register({
-    tool: "executePageCommands",
-    async execute(args) {
-      assert.equal(args.tabId, "tab_001")
-      return {
-        result: {
-          content: [{ type: "text", text: "{\"rows\":[]}" }],
-        },
+test("direct mcp skill engine iterates steps without tool registry", async () => {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+  const engine = new DirectMcpSkillEngine({
+    async call(name, args) {
+      calls.push({ name, args })
+      if (name === "openMenu") {
+        return { tabId: "tab_001" }
       }
+      return { ok: true }
     },
   })
 
-  const engine = new SkillEngine(new DefaultToolExecutor(registry))
   const result = await engine.run(query3040TodaySkill)
 
-  assert.deepEqual(result, {
-    status: "completed",
-    data: {
-      result: {
-        content: [{ type: "text", text: "{\"rows\":[]}" }],
+  assert.deepEqual(calls, [
+    {
+      name: "openMenu",
+      args: {
+        menuShortCode: "3040",
       },
     },
+    {
+      name: "executePageCommands",
+      args: {
+        tabId: "tab_001",
+        commands: [
+          {
+            componentId: "btn_query_1",
+            command: "click",
+          },
+        ],
+      },
+    },
+  ])
+  assert.deepEqual(result, {
+    status: "completed",
+    data: { ok: true },
+    steps: [
+      {
+        stepId: "open_menu",
+        action: "openMenu",
+        params: {
+          menuShortCode: "3040",
+        },
+        status: "completed",
+        result: { tabId: "tab_001" },
+      },
+      {
+        stepId: "execute_query",
+        action: "executePageCommands",
+        params: {
+          tabId: "tab_001",
+          commands: [
+            {
+              componentId: "btn_query_1",
+              command: "click",
+            },
+          ],
+        },
+        status: "completed",
+        result: { ok: true },
+      },
+    ],
   })
 })
 
-test("skill engine maps tool failures to failed result", async () => {
-  const registry = new ToolHandlerRegistry()
-  registry.register({
-    tool: "openMenu",
-    async execute() {
-      throw new ToolExecutionError("MENU_OPEN_FAILED", "打开菜单失败")
+test("direct mcp skill engine maps call failures to failed result", async () => {
+  const engine = new DirectMcpSkillEngine({
+    async call() {
+      throw new Error("network down")
     },
   })
 
-  const engine = new SkillEngine(new DefaultToolExecutor(registry))
   const result = await engine.run(query3040TodaySkill)
 
   assert.deepEqual(result, {
     status: "failed",
     error: {
-      code: "MENU_OPEN_FAILED",
-      message: "打开菜单失败",
+      code: "RUNTIME_EXCEPTION",
+      message: "执行过程中发生未预期异常",
     },
+    steps: [
+      {
+        stepId: "open_menu",
+        action: "openMenu",
+        params: {
+          menuShortCode: "3040",
+        },
+        status: "failed",
+        errorMessage: "执行过程中发生未预期异常",
+      },
+    ],
   })
 })
+
 
 

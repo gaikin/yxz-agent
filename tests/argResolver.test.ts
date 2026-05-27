@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { resolveArgs } from "../dcf/skills/argResolver"
+import { resolveArgs } from "../subprocess/service/SkillService"
 
 test("resolveArgs keeps literals and resolves xxxFrom paths recursively", () => {
   const values = {
@@ -46,5 +46,6 @@ test("resolveArgs throws when path cannot be resolved", () => {
     )
   )
 })
+
 
 

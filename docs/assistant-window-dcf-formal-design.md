@@ -24,7 +24,7 @@
 - 详细设计稿：[dcf-frontend-detailed-design.md](C:/dev/projects/work/yxz-agent/docs/dcf-frontend-detailed-design.md)
 - 模块拆分：[module-breakdown.md](C:/dev/projects/work/yxz-agent/docs/module-breakdown.md)
 - 开发任务清单：[dev-task-list.md](C:/dev/projects/work/yxz-agent/docs/dev-task-list.md)
-- 协议定义：[protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+- 协议定义：[protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 
 ## 2. 设计范围
 
@@ -392,7 +392,7 @@ frontend/
   services/
     assistant-window-channel-client.ts
     event-dispatcher.ts
-  shared/
+  share/
     event-mappers.ts
     formatters.ts
 ```

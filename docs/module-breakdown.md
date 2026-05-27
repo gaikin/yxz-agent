@@ -14,6 +14,11 @@
 - 协议定义单独成块，优先完成
 - 定时任务与人工对话复用执行链路，但在实施上拆开推进
 - 每个模块都应有清晰输入、输出和依赖
+- 所有功能模块都应支持独立引入，只保留必要耦合
+- 模块之间只通过公开接口、事件或共享协议协作，避免依赖彼此内部实现
+- UI 模块不直接调用执行、解析、上报等业务实现，只订阅状态并触发命令
+- 运行时模块不反向依赖具体 UI 框架
+- 工具执行模块不依赖具体业务场景，只根据标准输入执行并返回结果
 
 ## 三、模块总览
 
@@ -230,7 +235,7 @@
 
 模块：
 
-- [protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+- [protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 
 优先级：
 
@@ -303,7 +308,7 @@
 
 ### E 组：协议与联调
 
-- `shared/protocol.ts`
+- `share/protocol.ts`
 - mock 数据
 - 联调脚本
 
@@ -336,4 +341,4 @@
   - `resource-reader`
 
 - 公共层
-  - `shared/protocol.ts`
+  - `share/protocol.ts`

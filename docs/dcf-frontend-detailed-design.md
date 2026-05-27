@@ -288,7 +288,7 @@ frontend/
   services/
     assistant-window-channel-client.ts
     event-dispatcher.ts
-  shared/
+  share/
     event-mappers.ts
     formatters.ts
 ```
@@ -878,7 +878,7 @@ DCF 对助手子窗体需要提供三类能力：
 
 - 助手子窗体通过 `window.BridgeJs.sendToWindow` 向 DCF 发送消息
 - DCF 通过 `window.BridgeJs.listen` 对应的通道机制向助手子窗体推送事件
-- DCF 返回给助手子窗体的消息体应直接对齐 [protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+- DCF 返回给助手子窗体的消息体应直接对齐 [protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 - 不建议在助手子窗体侧散落 `window.BridgeJs` 调用，必须统一收敛到 `assistant-window-channel-client.ts`
 - `window.BridgeJs.listen` 的监听入参为 `message: { data: string[] }`
 - 业务事件统一从 `message.data[0]` 中读取 JSON 字符串后再反序列化
@@ -1283,7 +1283,7 @@ sequenceDiagram
 
 建议按以下顺序推进：
 
-1. 完成 `shared/protocol.ts` 对齐
+1. 完成 `share/protocol.ts` 对齐
 2. 完成 `React + Zustand` 助手子窗体骨架与 `JSBridge` 封装
 3. 完成智能体列表、历史会话摘要列表和会话详情加载
 4. 完成 DCF 启动状态机、开阳授权、token 刷新和 `eventHook` 订阅

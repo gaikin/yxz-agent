@@ -15,7 +15,7 @@
 
 - 讨论源文档：[discussion-decisions.md](C:/dev/projects/work/yxz-agent/docs/discussion-decisions.md)
 - 正式设计文档：[assistant-window-dcf-formal-design.md](C:/dev/projects/work/yxz-agent/docs/assistant-window-dcf-formal-design.md)
-- 共享协议：[protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+- 共享协议：[protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 
 ## 2. 助手子窗体 <-> DCF
 

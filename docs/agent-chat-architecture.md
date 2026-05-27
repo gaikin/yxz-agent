@@ -199,7 +199,7 @@ sequenceDiagram
   - `execute_tool`
   - `read_resource`
 
-详细类型定义见：[shared/protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+详细类型定义见：[share/protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 
 助手子窗体与 DCF 子进程详细设计见：[dcf-frontend-detailed-design.md](C:/dev/projects/work/yxz-agent/docs/dcf-frontend-detailed-design.md)
 

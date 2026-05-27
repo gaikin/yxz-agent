@@ -9,7 +9,7 @@
 - 总方案：[agent-chat-architecture.md](C:/dev/projects/work/yxz-agent/docs/agent-chat-architecture.md)
 - 详细设计：[dcf-frontend-detailed-design.md](C:/dev/projects/work/yxz-agent/docs/dcf-frontend-detailed-design.md)
 - 模块拆分：[module-breakdown.md](C:/dev/projects/work/yxz-agent/docs/module-breakdown.md)
-- 协议定义：[protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+- 协议定义：[protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 
 ## 二、实施范围
 
@@ -44,7 +44,7 @@
 #### T1 统一协议定义
 
 - 目标：收敛助手子窗体与 DCF、DCF 与后端之间的事件定义
-- 输入：详细设计、现有 [protocol.ts](C:/dev/projects/work/yxz-agent/shared/protocol.ts)
+- 输入：详细设计、现有 [protocol.ts](C:/dev/projects/work/yxz-agent/share/protocol.ts)
 - 输出：
   - `FrontendToDcfEvent`
   - `DcfToFrontendEvent`
@@ -64,7 +64,7 @@
 - 输出：
   - `frontend/`
   - `dcf-subprocess/`
-  - `shared/`
+  - `share/`
 - 验收标准：
   - 目录结构与详细设计一致
   - 关键占位文件可正常引用共享协议

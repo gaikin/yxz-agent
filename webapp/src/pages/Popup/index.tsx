@@ -10,7 +10,8 @@ import type {
   SchedulePendingExecutionItem,
 } from "../../../../share/protocol"
 import type { PopupPageInitData } from "../../../../share/hostTypes"
-import { formatNow } from "../../../../share/dateTime"
+import { formatNow } from "../../shared/utils/dateTime"
+import { KaiyangBaseCommunicationService } from "../../services/kaiyang-base-communication"
 
 const overlayStyle: CSSProperties = {
   position: "fixed",
@@ -223,21 +224,15 @@ export class PopupExecutionStore {
 }
 
 export class PopupChannelClient {
+  private readonly communication = new KaiyangBaseCommunicationService()
+
   constructor(
     private readonly deviceId: string,
-    private readonly channel = "schedule_popup",
-    private readonly candidateKeys: string[] = ["dcf", "DCF", "dcf-subprocess", "dcf_subprocess"]
+    private readonly channel = "schedule_popup"
   ) {}
 
   bindEvents(listener: (event: DcfToPopupEvent) => void): void {
-    const bridge = this.getBridge()
-    bridge.listen(this.channel, (message) => {
-      const raw = message?.data?.[0]
-      if (!raw) {
-        return
-      }
-      listener(JSON.parse(raw) as DcfToPopupEvent)
-    })
+    this.communication.listenJson(this.channel, listener)
   }
 
   async confirmAll(executionIds: string[]): Promise<void> {
@@ -261,56 +256,14 @@ export class PopupChannelClient {
   }
 
   private async send(event: unknown): Promise<void> {
-    const bridge = this.getBridge()
-    const windowId = await this.getDcfWindowId()
-    await Promise.resolve(bridge.sendToWindow(windowId, this.channel, JSON.stringify(event)))
-  }
-
-  private getBridge(): BridgeApi {
-    const bridge = globalThis.BridgeJs ?? globalThis.BridgeJS
-    if (!bridge) {
-      throw new Error("global BridgeJs/BridgeJS is not available")
-    }
-    return bridge
-  }
-
-  private async getDcfWindowId(): Promise<string> {
     const pageInitData = await this.getPageInitData()
-    if (pageInitData?.dcfWindowId) {
-      return pageInitData.dcfWindowId
-    }
-
-    if (typeof globalThis.getWinidsMap !== "function") {
-      throw new Error("global getWinidsMap is not available")
-    }
-
-    const map = await globalThis.getWinidsMap()
-    for (const key of this.candidateKeys) {
-      const matched = Object.entries(map).find(
-        ([mapKey, mapValue]) =>
-          mapKey === key ||
-          mapKey.includes(key) ||
-          mapValue === key ||
-          mapValue.includes(key)
-      )
-      if (matched) {
-        return matched[1]
-      }
-    }
-
-    const fallback = Object.values(map)[0]
-    if (!fallback) {
-      throw new Error("DCF windowId not found")
-    }
-    return fallback
+    await this.communication.sendJson(this.channel, event, {
+      dcfWindowId: pageInitData?.dcfWindowId,
+    })
   }
 
   private async getPageInitData(): Promise<PopupPageInitData | undefined> {
-    const bridge = globalThis.BridgeJs ?? globalThis.BridgeJS
-    if (typeof bridge?.getPageInitData !== "function") {
-      return undefined
-    }
-    return bridge.getPageInitData<PopupPageInitData>()
+    return this.communication.getPageInitData<PopupPageInitData>()
   }
 }
 

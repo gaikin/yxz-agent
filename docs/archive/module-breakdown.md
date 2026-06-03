@@ -2,7 +2,15 @@
 
 ## 一、目的
 
-本文档用于将“助手子窗体 + 营小助 DCF 子进程”方案拆分为可独立实施的功能模块，便于排期、分工和并行开发。
+本文档用于将早期“助手子窗体 + 营小助 DCF 子进程”方案拆分为可独立实施的功能模块，便于排期、分工和并行开发。
+
+> 状态说明：本文是早期模块拆分文档，保留用于排期和迁移参考。当前正式术语以 [terminology.md](C:/dev/projects/work/yxz-agent/docs/terminology.md) 为准，当前架构方向以 [thin-subprocess-window-agent-architecture.md](C:/dev/projects/work/yxz-agent/docs/thin-subprocess-window-agent-architecture.md) 为准。后续重写时，应将旧口径统一收敛为“子进程、主窗体、任务子窗体、执行层、展示层、开阳基座通信、运行事件分发”。
+
+整体分层重构口径优先见：[thin-subprocess-window-agent-architecture.md](C:/dev/projects/work/yxz-agent/docs/thin-subprocess-window-agent-architecture.md)
+
+术语规范见：[terminology.md](C:/dev/projects/work/yxz-agent/docs/terminology.md)
+
+分层拆解草案见：[layered-architecture-refactor.md](C:/dev/projects/work/yxz-agent/docs/layered-architecture-refactor.md)
 
 总方案见：[agent-chat-architecture.md](C:/dev/projects/work/yxz-agent/docs/agent-chat-architecture.md)  
 详细设计见：[dcf-frontend-detailed-design.md](C:/dev/projects/work/yxz-agent/docs/dcf-frontend-detailed-design.md)

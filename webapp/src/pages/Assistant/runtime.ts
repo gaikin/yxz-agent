@@ -1,26 +1,49 @@
 import type {
-  AutomationAuthorizationState,
-  DcfBootstrapRuntimeState,
   DcfToFrontendEvent,
+  FrontendAgentSnapshotEvent,
+  FrontendAssistantDoneEvent,
+  FrontendAssistantDeltaEvent,
   FrontendAutomationAuthorizedEvent,
   FrontendBootstrapStateEvent,
+  FrontendCancelRunEvent,
+  FrontendCreateSessionEvent,
+  FrontendGetSessionDetailEvent,
+  FrontendListAgentsEvent,
+  FrontendListSessionsEvent,
+  FrontendRunCancelledEvent,
+  FrontendRunFailedEvent,
+  FrontendRunStartedEvent,
   FrontendScheduleDisableEvent,
   FrontendScheduleDisabledEvent,
   FrontendScheduleEnableEvent,
   FrontendScheduleEnabledEvent,
   FrontendScheduleStateEvent,
   FrontendScheduleStateSnapshotEvent,
+  FrontendSessionCreatedEvent,
+  FrontendSessionDetailEvent,
+  FrontendSessionSnapshotEvent,
+  FrontendStepFinishedEvent,
+  FrontendStepStartedEvent,
   FrontendTriggerScheduleEvent,
-  ScheduleSummary,
+  FrontendUserMessageEvent,
 } from "../../../../share/protocol"
-import { formatNow } from "../../../../share/dateTime"
+import { AssistantMcpClient } from "../../assistant/execution-layer/mcp/mcp-client"
+import { TaskRecordUploader } from "../../assistant/execution-layer/records/task-record-uploader"
+import { AssistantChatClient } from "../../assistant/execution-layer/chat/chat-client"
+import { RuntimeEventDispatcher } from "../../assistant/execution-layer/events/runtime-event-dispatcher"
+import type { ChatStoreApi } from "../../assistant/stores/chat.store"
+import { createChatStore } from "../../assistant/stores/chat.store"
+import type { RunStoreApi } from "../../assistant/stores/run.store"
+import { createRunStore } from "../../assistant/stores/run.store"
+import type {
+  ScheduleStoreApi,
+  ScheduleStoreState,
+} from "../../assistant/stores/schedule.store"
+import { createScheduleStore } from "../../assistant/stores/schedule.store"
+import { formatNow } from "../../shared/utils/dateTime"
+import { KaiyangBaseCommunicationService } from "../../services/kaiyang-base-communication"
 
-export interface ScheduleStoreState {
-  automationAuthorization: AutomationAuthorizationState
-  bootstrapState?: DcfBootstrapRuntimeState
-  schedule?: ScheduleSummary
-  panelVisible: boolean
-}
+export type { ScheduleStoreState } from "../../assistant/stores/schedule.store"
 
 export interface AssistantWindowViewModel {
   bootstrapState: ScheduleStoreState["bootstrapState"]
@@ -31,250 +54,263 @@ export interface AssistantWindowViewModel {
   canOperateSchedule: boolean
 }
 
-export class ScheduleStore {
-  private readonly listeners = new Set<() => void>()
+export interface AssistantWindowRuntime {
+  scheduleStore: ScheduleStore
+  chatStore: ChatStoreApi
+  runStore: RunStoreApi
+  runtimeEventDispatcher: RuntimeEventDispatcher
+  channelClient: AssistantWindowChannelClient
+  chatClient: AssistantChatClient
+  mcpClient: AssistantMcpClient
+  taskRecordUploader: TaskRecordUploader
+}
 
-  private state: ScheduleStoreState = {
-    automationAuthorization: { authorized: false },
-    panelVisible: false,
-  }
+export class ScheduleStore {
+  private readonly storeApi = createScheduleStore()
 
   getState(): ScheduleStoreState {
-    return this.state
+    return this.storeApi.getState()
   }
 
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener)
-    return () => {
-      this.listeners.delete(listener)
-    }
+    return this.storeApi.subscribe(listener)
   }
 
   openPanel(): void {
-    this.patchState({ panelVisible: true })
+    this.storeApi.getState().openPanel()
   }
 
   closePanel(): void {
-    this.patchState({ panelVisible: false })
+    this.storeApi.getState().closePanel()
   }
 
   handleBootstrapState(event: FrontendBootstrapStateEvent): void {
-    this.patchState({
-      automationAuthorization: event.automationAuthorization,
-      bootstrapState: event.dcfRuntime,
-    })
+    this.storeApi.getState().applyBootstrapState(event)
   }
 
   handleAutomationAuthorized(event: FrontendAutomationAuthorizedEvent): void {
-    this.patchState({
-      automationAuthorization: {
-        authorized: true,
-        authorizedAt: event.authorizedAt,
-      },
-    })
+    this.storeApi.getState().applyAutomationAuthorized(event)
   }
 
   handleScheduleStateSnapshot(event: FrontendScheduleStateSnapshotEvent): void {
-    this.patchState({ schedule: event.schedules[0] })
+    this.storeApi.getState().applyScheduleStateSnapshot(event)
   }
 
   handleScheduleEnabled(event: FrontendScheduleEnabledEvent): void {
-    if (!this.state.schedule) {
-      return
-    }
-
-    this.patchState({
-      schedule: {
-        ...this.state.schedule,
-        enabled: true,
-        nextTriggerAt: event.nextTriggerAt,
-        lastStatus: "enabled",
-      },
-    })
+    this.storeApi.getState().applyScheduleEnabled(event)
   }
 
-  handleScheduleDisabled(_event: FrontendScheduleDisabledEvent): void {
-    if (!this.state.schedule) {
-      return
-    }
-
-    this.patchState({
-      schedule: {
-        ...this.state.schedule,
-        enabled: false,
-        nextTriggerAt: undefined,
-        lastStatus: "disabled",
-      },
-    })
-  }
-
-  private patchState(patch: Partial<ScheduleStoreState>): void {
-    this.state = {
-      ...this.state,
-      ...patch,
-    }
-    this.emitChange()
-  }
-
-  private emitChange(): void {
-    for (const listener of this.listeners) {
-      listener()
-    }
+  handleScheduleDisabled(event: FrontendScheduleDisabledEvent): void {
+    this.storeApi.getState().applyScheduleDisabled(event)
   }
 }
 
 export class AssistantWindowChannelClient {
+  private readonly communication = new KaiyangBaseCommunicationService()
+
   constructor(
     private readonly deviceId: string,
-    private readonly channel = "assistant_window",
-    private readonly candidateKeys: string[] = ["dcf", "DCF", "dcf-subprocess", "dcf_subprocess"]
+    private readonly channel = "assistant_window"
   ) {}
 
   bindEvents(listener: (event: DcfToFrontendEvent) => void): void {
-    const bridge = this.getBridge()
-    bridge.listen(this.channel, (message) => {
-      const raw = message?.data?.[0]
-      if (!raw) {
-        return
-      }
-      listener(JSON.parse(raw) as DcfToFrontendEvent)
-    })
+    this.communication.listenJson(this.channel, listener)
   }
 
   async authorizeAutomation(): Promise<void> {
-    const event: FrontendAutomationAuthorizedRequest = {
+    const event = {
       type: "AUTHORIZE_AUTOMATION",
       deviceId: this.deviceId,
       sentAt: formatNow(),
-    }
-    await this.send(event)
+    } satisfies FrontendAuthorizeAutomationEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
   async requestScheduleState(): Promise<void> {
-    const event: FrontendScheduleStateEvent = {
+    const event = {
       type: "SCHEDULE_STATE",
       deviceId: this.deviceId,
       sentAt: formatNow(),
-    }
-    await this.send(event)
+    } satisfies FrontendScheduleStateEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
   async enableSchedule(scheduleId: string): Promise<void> {
-    const event: FrontendScheduleEnableEvent = {
+    const event = {
       type: "SCHEDULE_ENABLE",
       deviceId: this.deviceId,
       scheduleId,
       sentAt: formatNow(),
-    }
-    await this.send(event)
+    } satisfies FrontendScheduleEnableEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
   async disableSchedule(scheduleId: string): Promise<void> {
-    const event: FrontendScheduleDisableEvent = {
+    const event = {
       type: "SCHEDULE_DISABLE",
       deviceId: this.deviceId,
       scheduleId,
       sentAt: formatNow(),
-    }
-    await this.send(event)
+    } satisfies FrontendScheduleDisableEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
   async triggerSchedule(scheduleId: string, requestedAt?: string): Promise<void> {
-    const event: FrontendTriggerScheduleEvent = {
+    const event = {
       type: "TRIGGER_SCHEDULE",
       deviceId: this.deviceId,
       scheduleId,
       requestedAt,
       sentAt: formatNow(),
-    }
-    await this.send(event)
+    } satisfies FrontendTriggerScheduleEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
-  private async send(event: unknown): Promise<void> {
-    const bridge = this.getBridge()
-    const windowId = await this.getDcfWindowId()
-    await Promise.resolve(bridge.sendToWindow(windowId, this.channel, JSON.stringify(event)))
+  async listAgents(): Promise<void> {
+    const event = {
+      type: "LIST_AGENTS",
+      deviceId: this.deviceId,
+      sentAt: formatNow(),
+    } satisfies FrontendListAgentsEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
-  private getBridge(): BridgeApi {
-    const bridge = globalThis.BridgeJs ?? globalThis.BridgeJS
-    if (!bridge) {
-      throw new Error("global BridgeJs/BridgeJS is not available")
-    }
-    return bridge
+  async listSessions(): Promise<void> {
+    const event = {
+      type: "LIST_SESSIONS",
+      deviceId: this.deviceId,
+      sentAt: formatNow(),
+    } satisfies FrontendListSessionsEvent
+    await this.communication.sendJson(this.channel, event)
   }
 
-  private async getDcfWindowId(): Promise<string> {
-    if (typeof globalThis.getWinidsMap !== "function") {
-      throw new Error("global getWinidsMap is not available")
-    }
+  async getSessionDetail(sessionId: string): Promise<void> {
+    const event = {
+      type: "GET_SESSION_DETAIL",
+      deviceId: this.deviceId,
+      sessionId,
+      sentAt: formatNow(),
+    } satisfies FrontendGetSessionDetailEvent
+    await this.communication.sendJson(this.channel, event)
+  }
 
-    const map = await globalThis.getWinidsMap()
-    for (const key of this.candidateKeys) {
-      const matched = Object.entries(map).find(
-        ([mapKey, mapValue]) =>
-          mapKey === key ||
-          mapKey.includes(key) ||
-          mapValue === key ||
-          mapValue.includes(key)
-      )
-      if (matched) {
-        return matched[1]
-      }
-    }
+  async createSession(agentId: string): Promise<void> {
+    const event = {
+      type: "CREATE_SESSION",
+      deviceId: this.deviceId,
+      agentId,
+      sentAt: formatNow(),
+    } satisfies FrontendCreateSessionEvent
+    await this.communication.sendJson(this.channel, event)
+  }
 
-    const fallback = Object.values(map)[0]
-    if (!fallback) {
-      throw new Error("DCF windowId not found")
-    }
-    return fallback
+  async sendUserMessage(sessionId: string, text: string): Promise<void> {
+    const event = {
+      type: "USER_MESSAGE",
+      deviceId: this.deviceId,
+      sessionId,
+      text,
+      sentAt: formatNow(),
+    } satisfies FrontendUserMessageEvent
+    await this.communication.sendJson(this.channel, event)
+  }
+
+  async cancelRun(sessionId: string, runId: string): Promise<void> {
+    const event = {
+      type: "CANCEL_RUN",
+      deviceId: this.deviceId,
+      sessionId,
+      runId,
+      sentAt: formatNow(),
+    } satisfies FrontendCancelRunEvent
+    await this.communication.sendJson(this.channel, event)
   }
 }
 
-type FrontendAutomationAuthorizedRequest = {
+type FrontendAuthorizeAutomationEvent = {
   type: "AUTHORIZE_AUTOMATION"
   deviceId: string
   sentAt: string
 }
 
-export interface AssistantWindowRuntime {
-  scheduleStore: ScheduleStore
-  channelClient: AssistantWindowChannelClient
-}
-
 export function bootstrapAssistantWindow(deviceId = "device-001"): AssistantWindowRuntime {
-  const scheduleStore = new ScheduleStore()
   const channelClient = new AssistantWindowChannelClient(deviceId)
+  const runtime: AssistantWindowRuntime = {
+    scheduleStore: new ScheduleStore(),
+    chatStore: createChatStore(),
+    runStore: createRunStore(),
+    runtimeEventDispatcher: new RuntimeEventDispatcher(),
+    channelClient,
+    chatClient: new AssistantChatClient(channelClient),
+    mcpClient: new AssistantMcpClient(),
+    taskRecordUploader: new TaskRecordUploader(),
+  }
 
-  channelClient.bindEvents((event) => {
-    applyAssistantWindowEvent(scheduleStore, event)
+  runtime.channelClient.bindEvents((event) => {
+    applyAssistantWindowEvent(runtime, event)
   })
 
-  return {
-    scheduleStore,
-    channelClient,
-  }
+  return runtime
 }
 
 export function applyAssistantWindowEvent(
-  scheduleStore: ScheduleStore,
+  runtime: AssistantWindowRuntime,
   event: DcfToFrontendEvent
 ): void {
+  runtime.chatClient.handleFrontendEvent(event)
+
   switch (event.type) {
     case "BOOTSTRAP_STATE":
-      scheduleStore.handleBootstrapState(event)
+      runtime.scheduleStore.handleBootstrapState(event)
       return
     case "AUTOMATION_AUTHORIZED":
-      scheduleStore.handleAutomationAuthorized(event)
+      runtime.scheduleStore.handleAutomationAuthorized(event)
       return
     case "SCHEDULE_STATE_SNAPSHOT":
-      scheduleStore.handleScheduleStateSnapshot(event)
+      runtime.scheduleStore.handleScheduleStateSnapshot(event)
       return
     case "SCHEDULE_ENABLED":
-      scheduleStore.handleScheduleEnabled(event)
+      runtime.scheduleStore.handleScheduleEnabled(event)
       return
     case "SCHEDULE_DISABLED":
-      scheduleStore.handleScheduleDisabled(event)
+      runtime.scheduleStore.handleScheduleDisabled(event)
+      return
+    case "AGENT_SNAPSHOT":
+      runtime.chatStore.getState().applyAgentSnapshot(event)
+      return
+    case "SESSION_SNAPSHOT":
+      runtime.chatStore.getState().applySessionSnapshot(event)
+      return
+    case "SESSION_DETAIL":
+      runtime.chatStore.getState().applySessionDetail(event)
+      return
+    case "SESSION_CREATED":
+      runtime.chatStore.getState().applySessionCreated(event)
+      return
+    case "RUN_STARTED":
+      runtime.chatStore.getState().applyRunStarted(event)
+      runtime.runStore.getState().applyRunStarted(event)
+      return
+    case "STEP_STARTED":
+      runtime.runStore.getState().applyStepStarted(event)
+      return
+    case "STEP_FINISHED":
+      runtime.runStore.getState().applyStepFinished(event)
+      return
+    case "ASSISTANT_DELTA":
+      runtime.chatStore.getState().applyAssistantDelta(event)
+      return
+    case "ASSISTANT_DONE":
+      runtime.chatStore.getState().applyAssistantDone(event)
+      runtime.runStore.getState().applyAssistantDone(event)
+      return
+    case "RUN_FAILED":
+      runtime.chatStore.getState().applyRunFailed(event)
+      runtime.runStore.getState().applyRunFailed(event)
+      return
+    case "RUN_CANCELLED":
+      runtime.chatStore.getState().applyRunCancelled(event)
+      runtime.runStore.getState().applyRunCancelled(event)
       return
     default:
       return

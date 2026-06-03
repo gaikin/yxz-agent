@@ -20,6 +20,11 @@ import {
   type PopupEventPublisher,
 } from "./ChannelService"
 import {
+  AssistantAgentCatalogService,
+  AssistantConversationRuntimeService,
+  AssistantSessionStoreService,
+} from "./chat/AssistantSessionService"
+import {
   SseSessionJsonRpcToolTransport,
   type JsonRpcToolTransportFactory,
   type JsonRpcToolTransport,
@@ -45,6 +50,7 @@ export interface DcfBootstrapDependencies {
 }
 
 export interface DcfRuntime {
+  assistantConversationRuntimeService: AssistantConversationRuntimeService
   automationAuthorizationService: AutomationAuthorizationService
   scheduleDefinitionService: ScheduleDefinitionService
   scheduleRuntimeService: ScheduleRuntimeService
@@ -65,6 +71,7 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
   const rumJsCache = deps.rumJsCache ?? createDemoRumJsCache()
 
   const {
+    assistantSessionStoreService,
     automationAuthorizationService,
     scheduleDefinitionService,
     scheduleRuntimeService,
@@ -92,6 +99,13 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
         await Promise.resolve(deps.onPendingExecutionsUpdated?.(overview))
       }
     : popupChannelService.notify.bind(popupChannelService)
+
+  const assistantConversationRuntimeService = new AssistantConversationRuntimeService(
+    deviceId,
+    new AssistantAgentCatalogService(),
+    assistantSessionStoreService,
+    deps.publishFrontendEvent
+  )
 
   const toolTransportFactory = createToolTransportFactory(deps, config.mcpBaseUrl)
   const scheduleSkillCatalogService = new ScheduleSkillCatalogService()
@@ -123,7 +137,11 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
       })
     }
   )
-  frontendChannelService.bindRuntime(scheduleTimerService, scheduleExecutionService)
+  frontendChannelService.bindRuntime(
+    scheduleTimerService,
+    scheduleExecutionService,
+    assistantConversationRuntimeService
+  )
   popupChannelService.bindRuntime(scheduleExecutionService, scheduleDefinitionService)
 
   runtimeState.set({
@@ -139,8 +157,11 @@ export async function bootstrapDcf(deps: DcfBootstrapDependencies): Promise<DcfR
   )
 
   await frontendChannelService.publishBootstrapState()
+  await frontendChannelService.publishAgentSnapshot()
+  await frontendChannelService.publishSessionSnapshot()
 
   return {
+    assistantConversationRuntimeService,
     automationAuthorizationService,
     scheduleDefinitionService,
     scheduleRuntimeService,
@@ -165,6 +186,10 @@ function createStores(
   schedules: import("./scheduler/ScheduleStateService").ScheduleDefinition[]
 ) {
   return {
+    assistantSessionStoreService: new AssistantSessionStoreService(
+      rumJsCache,
+      "assistant-sessions.json"
+    ),
     automationAuthorizationService: new AutomationAuthorizationService(
       rumJsCache,
       "automation-authorization.json"

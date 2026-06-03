@@ -16,9 +16,9 @@
 - 任务执行窗口通过开阳 MCP 和内置工具执行脚本。
 - 执行过程和最终结果上报服务端。
 
-详细架构说明见：[event-triggered-task-architecture.md](C:/dev/projects/work/yxz-agent/docs/event-triggered-task-architecture.md)
+详细架构说明见：[event-triggered-task-architecture.md](C:/dev/projects/work/yxz-agent/docs/archive/event-triggered-task-architecture.md)
 
-脚本制作规范见：[event-task-script-authoring-guide.md](C:/dev/projects/work/yxz-agent/docs/event-task-script-authoring-guide.md)
+脚本制作规范见：[event-task-script-authoring-guide.md](C:/dev/projects/work/yxz-agent/docs/archive/event-task-script-authoring-guide.md)
 
 ## 2. 目标与边界
 
@@ -47,6 +47,7 @@
 - 任务执行窗口根据 `skillId` 实时获取 skill 并提取执行脚本，不使用缓存。
 - 脚本执行前需要用户确认。
 - 脚本步骤串行执行，失败快速终止。
+- 脚本支持步骤级执行前延迟、显式输出变量、JSON Logic 条件判断和受限循环编排。
 - 每个 step 执行完成后实时上报。
 - execution 开始和结束分别上报。
 - 用户可中止当前任务。
@@ -56,7 +57,6 @@
 
 - 脚本缓存。
 - 执行重试。
-- 条件分支。
 - 并发执行。
 - 队列持久化。
 - callbackUrl 注册重试和回调服务健康检查。
@@ -239,13 +239,17 @@ skill 获取失败或脚本提取失败时，不展示任务状态，不上报 `
 
 ### 5.5 脚本执行策略
 
-本期采用串行执行和快速失败策略。脚本在开发态确认具体工具，运行态不做业务 action 映射。脚本只有在用户确认后才开始执行。
+脚本执行采用结构化 JSON DSL。脚本由任务执行窗口 Runtime 解释执行，Runtime 负责步骤编排、变量解析、工具调用、执行记录生成、状态上报和中止控制。服务端负责发布前静态校验，只向客户端下发校验通过的脚本；Runtime 在执行时做必要的防御性检查，不承担完整 schema 校验职责。
+
+脚本在开发态直接确认 MCP、工具和参数，运行态不做业务 action 到底层 tool 的映射。脚本只有在用户确认后才开始执行。
 
 step 基本结构：
 
 ```json
 {
-  "stepId": "read-result",
+  "stepId": "readResult",
+  "beforeDelayMs": 300,
+  "output": "result",
   "executor": {
     "type": "mcp",
     "mcpName": "kaiyang",
@@ -257,6 +261,16 @@ step 基本结构：
 }
 ```
 
+字段说明：
+
+| 字段 | 说明 |
+|---|---|
+| `stepId` | step 唯一标识，使用小驼峰命名 |
+| `beforeDelayMs` | 执行当前 step 前的固定等待时间，可选，未配置时按 `0` 处理 |
+| `output` | 当前 step 工具结果保存到变量上下文时使用的顶层变量名，可选 |
+| `executor` | 执行器声明，决定调用 MCP 工具或内置工具 |
+| `params` | 工具参数，支持模板变量 |
+
 运行态只关心两类执行通道：
 
 | executor.type | 说明 |
@@ -266,6 +280,8 @@ step 基本结构：
 
 配置平台可以基于工具 schema 做参数校验，也减少运行态维护 action 映射表的复杂度。相应地，脚本会直接绑定 MCP tool 名和参数 schema，工具变更时需要服务端配置校验和兼容策略兜底。
 
+#### 5.5.1 执行模型
+
 执行规则：
 
 - 窗口内 FIFO 队列。
@@ -273,19 +289,205 @@ step 基本结构：
 - 脚本提取成功后进入待确认状态，待确认期间阻塞后续队列任务。
 - 用户确认后上报 `execution.started` 并开始执行 steps。
 - 用户取消时不上报 execution，记录日志和埋点后处理下一个队列任务。
-- steps 严格串行。
+- steps 按配置顺序串行执行。
 - 任一步失败，立即停止后续步骤。
-- 每个 step 都上报 `step.finished`。
+- 每个 step 都生成执行记录，并上报 `step.finished`。
 - 不支持 retry。
-- 不支持条件分支。
+- 不支持并发执行。
 - 不设置脚本级总超时。
-- step 可传 `timeoutMs`，未传时使用底层工具超时逻辑。
+- 底层工具超时由具体工具或执行通道负责。
 
-这个策略能让一期执行行为更可预测，也能降低状态管理复杂度。复杂编排能力，如条件分支、重试、并发执行，留到后续版本再引入。
+`beforeDelayMs` 用于在当前 step 调用 executor 前进行固定等待，适合为页面元素加载、弹窗渲染、列表刷新预留缓冲时间。该等待必须支持取消：用户在等待期间中止任务时，等待立即结束，当前 step 以 `USER_CANCELED` 失败上报，Runtime 不再调用当前 step 的 executor。`beforeDelayMs` 不单独上报，耗时计入当前 step 的 `durationMs`。
+
+#### 5.5.2 变量与输出
+
+工具执行结果默认只进入执行记录和工具日志，不自动进入变量上下文。step 显式声明 `output` 后，工具结果才保存为顶层变量：
+
+```json
+{
+  "stepId": "readUser",
+  "output": "user",
+  "executor": {
+    "type": "mcp",
+    "mcpName": "kaiyang",
+    "toolName": "read"
+  },
+  "params": {
+    "componentId": "pension.userPanel"
+  }
+}
+```
+
+后续 step 可以直接引用顶层变量：
+
+```json
+{
+  "stepId": "syncResult",
+  "executor": {
+    "type": "builtin",
+    "toolName": "request"
+  },
+  "params": {
+    "method": "POST",
+    "url": "https://example.com/api/{{$_EVENT.menuCode}}/result",
+    "headers": {
+      "Authorization": "Bearer {{$_EVENT.token}}"
+    },
+    "body": {
+      "name": "{{user.name}}",
+      "amount": "{{user.amount}}"
+    }
+  }
+}
+```
+
+变量规则：
+
+- 系统变量统一使用 `$_` 前缀，本期仅支持 `$_EVENT`。
+- 用户输出变量使用顶层变量名，例如 `user.name`、`result.amount`。
+- `output` 变量名使用小驼峰命名，且全局唯一。
+- `output` 变量名不能以 `$` 或 `_` 开头。
+- 工具结果允许保存为 `null`，变量名存在即不算缺失。
+- 缺失变量直接报错，当前 step 失败，错误码为 `VARIABLE_RESOLVE_FAILED`。
+- 当模板字符串只包含一个变量时，保留变量原始类型；字符串拼接场景按字符串渲染。
+
+#### 5.5.3 条件与循环
+
+脚本支持三类节点：
+
+| 节点类型 | 用途 | 执行语义 |
+|---|---|---|
+| tool step | 执行具体 MCP 或内置工具 | 调用 `executor` 指定的工具 |
+| group step | 对一组步骤统一设置条件 | `when=true` 时串行执行内部 steps，`when=false` 时整体 skipped |
+| foreach step | 遍历数组并重复执行内部 steps | 先计算 `items`，再按数组顺序逐项串行执行内部 steps |
+
+条件和循环表达式采用 `json-logic-engine`，表达式必须是 JSON Logic 对象，不支持 JS 表达式或字符串表达式。
+
+group 示例：
+
+```json
+{
+  "stepId": "submitFlow",
+  "type": "group",
+  "when": {
+    "and": [
+      { ">": [{ "var": "result.amount" }, 0] },
+      { "==": [{ "var": "$_EVENT.menuCode" }, "3040"] }
+    ]
+  },
+  "steps": [
+    {
+      "stepId": "clickSubmit",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "kaiyang",
+        "toolName": "click"
+      },
+      "params": {
+        "componentId": "pension.submitButton"
+      }
+    }
+  ]
+}
+```
+
+foreach 示例：
+
+```json
+{
+  "stepId": "processItems",
+  "type": "foreach",
+  "foreach": {
+    "items": { "var": "list.items" },
+    "itemName": "item",
+    "maxIterations": 50
+  },
+  "steps": [
+    {
+      "stepId": "inputName",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "kaiyang",
+        "toolName": "input"
+      },
+      "params": {
+        "componentId": "pension.nameInput",
+        "value": "{{item.name}}"
+      }
+    }
+  ]
+}
+```
+
+控制流规则：
+
+- `when` 只做轻量布尔判断，不做接口调用或副作用。
+- `when=false` 时当前 step 或 group 记录为 `skipped`，不算失败。
+- `when` 求值异常时当前 step 失败。
+- `foreach.items` 求值结果必须是数组。
+- `foreach.maxIterations` 必填。
+- group 和 foreach 可以嵌套，但必须限制最大嵌套层级。
+- 任一内部 step 失败时，默认停止当前控制流和后续外部步骤。
+
+#### 5.5.4 执行记录与上报
+
+执行记录用于任务窗口展示、日志和服务端上报。执行记录与变量上下文分离，未声明 `output` 的 step 也必须产生执行记录。
+
+执行记录建议结构：
+
+```json
+{
+  "stepId": "readResult",
+  "stepPath": "readResult",
+  "status": "completed",
+  "executor": {
+    "type": "mcp",
+    "mcpName": "kaiyang",
+    "toolName": "read"
+  },
+  "beforeDelayMs": 300,
+  "startedAt": "2026-06-03T10:00:00.000Z",
+  "finishedAt": "2026-06-03T10:00:01.000Z",
+  "durationMs": 1000,
+  "outputName": "result"
+}
+```
+
+`stepPath` 由 Runtime 生成，用于区分普通 step、group 内 step 和 foreach 展开后的 step。普通 step 的 `stepPath` 等于 `stepId`；循环内 step 可生成类似 `processItems[0].inputName` 的路径。
+
+上报事件包括：
+
+| 事件 | 触发时机 | 说明 |
+|---|---|---|
+| `execution.started` | 用户确认执行后，准备执行第一个 step 前 | 标识一次 execution 开始 |
+| `step.started` | 当前 step 开始处理前 | 包含 `stepId`、`stepPath` 和 `beforeDelayMs` |
+| `step.finished` | 当前 step completed、failed 或 skipped 后 | 包含完整 step 执行记录 |
+| `execution.finished` | 全部执行成功、失败或用户中止后 | 标识一次 execution 结束 |
+
+#### 5.5.5 服务端静态校验
+
+服务端发布前必须完成静态校验。校验内容包括：
+
+- 脚本基础字段完整，`steps` 非空。
+- `stepId` 全局唯一且使用小驼峰命名。
+- `beforeDelayMs` 为大于等于 `0` 的整数。
+- `executor.type`、`mcpName`、`toolName` 合法且工具存在。
+- `params` 满足所选工具 schema。
+- 变量引用只指向 `$_EVENT` 或前置输出变量。
+- 被引用的输出变量必须由前置 step 通过 `output` 显式声明。
+- `output` 变量名全局唯一、使用小驼峰命名，且不以 `$` 或 `_` 开头。
+- JSON Logic 表达式结构合法。
+- `when` 表达式求值结果为 boolean。
+- `foreach.items` 求值结果为数组。
+- `foreach.maxIterations` 必填且不超过服务端配置上限。
+- group 和 foreach 的嵌套层级不超过服务端配置上限。
+- 循环展开后的最大 step 数不超过服务端配置上限。
+
+该执行策略在保持串行、可观测和快速失败的基础上，提供受控的条件与循环编排能力。所有控制流均由 Runtime 解释执行，不引入任意脚本执行，不改变 MCP 与内置工具的调用边界。
 
 ### 5.6 任务中止与窗口关闭
 
-用户点击中止时，只中止当前 running execution，等待队列保留。中止采用软中止策略：当前 step 支持取消则尝试取消；不支持取消则等待当前 step 返回后停止后续步骤。中止时需要上报 `step.finished failed` 和 `execution.finished failed`，错误码为 `USER_CANCELED`。
+用户点击中止时，只中止当前 running execution，等待队列保留。中止采用软中止策略：当前 step 处于 `beforeDelayMs` 等待阶段时，等待立即取消，当前 step 以 `USER_CANCELED` 失败上报，且不再调用 executor；当前 step 已进入工具调用阶段时，如果底层工具支持取消则尝试取消，不支持取消则等待当前 step 返回后停止后续步骤。中止时需要上报 `step.finished failed` 和 `execution.finished failed`，错误码为 `USER_CANCELED`。
 
 用户在待确认状态点击取消时，当前任务不进入 execution，不上报 `execution.started` 或 `execution.finished`，只记录日志和埋点，然后继续处理队列中的下一个任务。
 
@@ -317,9 +519,13 @@ step 基本结构：
 | skill 获取失败/脚本提取失败 | 不进入执行，不展示任务状态，不上报 execution |
 | 用户取消执行确认 | 不进入执行，不上报 execution，继续处理下一个任务 |
 | 队列满 | 丢弃最新事件，不破坏 FIFO |
+| 变量解析失败 | 当前 step failed，错误码为 `VARIABLE_RESOLVE_FAILED` |
+| `when=false` | 当前 step 或 group skipped，不算失败 |
+| `when` 求值异常 | 当前 step failed，停止后续步骤 |
+| `foreach.items` 非数组 | 当前 foreach step failed，停止后续步骤 |
 | step 失败 | 快速失败，停止后续步骤 |
 | 上报失败 | 记录日志和埋点，继续本地执行 |
-| 用户中止 | 中止当前任务，等待队列保留 |
+| 用户中止 | 中止当前任务，当前 step 和 execution 按 `USER_CANCELED` 上报，等待队列保留 |
 | 用户关闭窗口 | 终止当前任务并清空等待队列 |
 
 本期明确接受的边界：
@@ -360,7 +566,7 @@ report_event_failed
 - Runtime 拉取事件后没有开始执行时，检查事件是否携带 `skillId`、skill 是否获取成功、脚本是否提取成功。
 - 脚本提取成功但未执行时，检查确认信息是否展示、用户是否确认或取消。
 - 服务端没有执行记录时，检查 `execution_started`、`execution_finished` 和 `report_event_failed`。
-- 任务失败时，优先看失败 step 的错误码和 MCP 或内置工具原始错误。
+- 任务失败时，优先看失败 step 的 `stepPath`、错误码、变量解析详情和 MCP 或内置工具原始错误。
 
 ## 8. 风险与后续
 
@@ -379,7 +585,8 @@ report_event_failed
 - 引入 callbackUrl 注册重试和回调服务健康检查。
 - 引入 `pendingTriggers` 或执行队列持久化。
 - 支持 skill 或脚本缓存和兜底执行。
-- 支持步骤重试、条件分支和更复杂编排。
+- 支持步骤重试。
+- 支持更友好的表达式作者工具，并在发布前编译为 JSON Logic。
 - 支持工具版本管理和脚本批量迁移。
 
 ## 9. 结论

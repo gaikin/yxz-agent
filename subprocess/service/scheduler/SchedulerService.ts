@@ -116,6 +116,7 @@ export class ScheduleTimerService {
 
       await this.register(schedule, new Date(nextTriggerAt.getTime() + 1000))
     }, delay)
+    timer.unref?.()
 
     this.jobs.set(schedule.scheduleId, {
       schedule,

@@ -386,6 +386,8 @@ test("initializeDcfRuntime can publish events through sendEventByWinId bridge", 
     },
   })
 
+  sentEvents.length = 0
+
   await runtime.frontendChannelService.publishBootstrapState()
   await runtime.popupChannelService.notify({
     pendingCount: 1,

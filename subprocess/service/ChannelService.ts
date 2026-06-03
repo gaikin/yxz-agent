@@ -22,6 +22,9 @@ import {
   ScheduleRuntimeService,
 } from "./scheduler/ScheduleStateService"
 import { ScheduleExecutionService, ScheduleTimerService } from "./scheduler/SchedulerService"
+import {
+  AssistantConversationRuntimeService,
+} from "./chat/AssistantSessionService"
 
 export type FrontendEventPublisher = (event: DcfToFrontendEvent) => Promise<void>
 
@@ -30,6 +33,7 @@ export type PopupEventPublisher = (event: DcfToPopupEvent) => Promise<void>
 export class FrontendChannelService {
   private scheduleTimerService?: ScheduleTimerService
   private scheduleExecutionService?: ScheduleExecutionService
+  private assistantConversationRuntimeService?: AssistantConversationRuntimeService
 
   constructor(
     private readonly publishFrontendEvent: FrontendEventPublisher,
@@ -44,10 +48,12 @@ export class FrontendChannelService {
 
   bindRuntime(
     scheduleTimerService: ScheduleTimerService,
-    scheduleExecutionService: ScheduleExecutionService
+    scheduleExecutionService: ScheduleExecutionService,
+    assistantConversationRuntimeService: AssistantConversationRuntimeService
   ): void {
     this.scheduleTimerService = scheduleTimerService
     this.scheduleExecutionService = scheduleExecutionService
+    this.assistantConversationRuntimeService = assistantConversationRuntimeService
   }
 
   async receive(event: FrontendToDcfEvent | string): Promise<void> {
@@ -69,6 +75,24 @@ export class FrontendChannelService {
         return
       case "TRIGGER_SCHEDULE":
         await this.triggerSchedule(parsed)
+        return
+      case "LIST_AGENTS":
+        await this.publishAgentSnapshot()
+        return
+      case "LIST_SESSIONS":
+        await this.publishSessionSnapshot()
+        return
+      case "GET_SESSION_DETAIL":
+        await this.publishSessionDetail(parsed.sessionId)
+        return
+      case "CREATE_SESSION":
+        await this.createSession(parsed.agentId)
+        return
+      case "USER_MESSAGE":
+        await this.sendUserMessage(parsed.sessionId, parsed.text)
+        return
+      case "CANCEL_RUN":
+        await this.cancelRun(parsed.sessionId, parsed.runId)
         return
       default:
         return
@@ -145,6 +169,41 @@ export class FrontendChannelService {
     await this.publishFrontendEvent(event)
   }
 
+  async publishAgentSnapshot(): Promise<void> {
+    const event = {
+      type: "AGENT_SNAPSHOT",
+      deviceId: this.deviceId,
+      agents: await this.getAssistantConversationRuntimeService().listAgents(),
+      sentAt: formatNow(),
+    } as const
+    await this.publishFrontendEvent(event)
+  }
+
+  async publishSessionSnapshot(): Promise<void> {
+    const event = {
+      type: "SESSION_SNAPSHOT",
+      deviceId: this.deviceId,
+      sessions: await this.getAssistantConversationRuntimeService().listSessions(),
+      sentAt: formatNow(),
+    } as const
+    await this.publishFrontendEvent(event)
+  }
+
+  async publishSessionDetail(sessionId: string): Promise<void> {
+    const session = await this.getAssistantConversationRuntimeService().getSessionDetail(sessionId)
+    if (!session) {
+      return
+    }
+
+    const event = {
+      type: "SESSION_DETAIL",
+      deviceId: this.deviceId,
+      session,
+      sentAt: formatNow(),
+    } as const
+    await this.publishFrontendEvent(event)
+  }
+
   private async authorizeAutomation(): Promise<void> {
     const authorizedAt = formatNow()
     await this.automationAuthorizationService.authorize(authorizedAt)
@@ -183,6 +242,27 @@ export class FrontendChannelService {
       schedule,
       event.requestedAt ? parseDateTime(event.requestedAt) : undefined
     )
+  }
+
+  private async createSession(agentId: string): Promise<void> {
+    await this.getAssistantConversationRuntimeService().createSession(agentId)
+  }
+
+  private async sendUserMessage(sessionId: string, text: string): Promise<void> {
+    await this.getAssistantConversationRuntimeService().sendUserMessage(sessionId, text)
+  }
+
+  private async cancelRun(sessionId: string, runId: string): Promise<void> {
+    await this.getAssistantConversationRuntimeService().cancelRun(sessionId, runId)
+  }
+
+  private getAssistantConversationRuntimeService(): AssistantConversationRuntimeService {
+    if (!this.assistantConversationRuntimeService) {
+      throw new Error(
+        "FrontendChannelService has not been bound to AssistantConversationRuntimeService"
+      )
+    }
+    return this.assistantConversationRuntimeService
   }
 
   private getScheduleExecutionService(): ScheduleExecutionService {

@@ -153,9 +153,12 @@ test("dcf bootstrap publishes bootstrap state using rumJs cache backed stores", 
   })
 
   assert.ok(runtime)
-  assert.equal(frontendEvents.length, 1)
+  assert.equal(frontendEvents.length, 3)
   assert.equal((frontendEvents[0] as { type: string }).type, "BOOTSTRAP_STATE")
+  assert.equal((frontendEvents[1] as { type: string }).type, "AGENT_SNAPSHOT")
+  assert.equal((frontendEvents[2] as { type: string }).type, "SESSION_SNAPSHOT")
   assert.equal(popupEvents.length, 0)
+  await runtime.scheduleTimerService.stop()
 })
 
 test("dcf bootstrap falls back to in-memory demo data when no cache is provided", async () => {
@@ -183,7 +186,7 @@ test("dcf bootstrap falls back to in-memory demo data when no cache is provided"
   })
 
   assert.ok(runtime)
-  assert.equal(frontendEvents.length, 1)
+  assert.equal(frontendEvents.length, 3)
   assert.equal(frontendEvents[0].type, "BOOTSTRAP_STATE")
   assert.equal(frontendEvents[0].automationAuthorization?.authorized, true)
   assert.equal(
@@ -193,6 +196,57 @@ test("dcf bootstrap falls back to in-memory demo data when no cache is provided"
 
   const runtimeState = await runtime.scheduleRuntimeService.get("schedule_3040_daily")
   assert.equal(runtimeState?.enabled, true)
+
+  await runtime.scheduleTimerService.stop()
+})
+
+test("dcf bootstrap supports session creation and message run events", async () => {
+  const frontendEvents: Array<{ type: string; session?: unknown }> = []
+
+  const runtime = await bootstrapDcf({
+    workspaceRoot: process.cwd(),
+    publishFrontendEvent: async (event) => {
+      frontendEvents.push(event as unknown as { type: string; session?: unknown })
+    },
+    publishPopupEvent: async () => {},
+    toolTransport: {
+      async send() {
+        return {
+          result: {
+            content: [{ type: "text", text: "{}" }],
+          },
+        }
+      },
+      close() {},
+    },
+    rumJsCache: new MemoryRumJsCache(),
+  })
+
+  await runtime.receiveFrontendEvent({
+    type: "CREATE_SESSION",
+    deviceId: "device-001",
+    agentId: "yxz-assistant",
+    sentAt: formatNow(),
+  })
+
+  const createdSessionEvent = frontendEvents.find((event) => event.type === "SESSION_CREATED")
+  assert.ok(createdSessionEvent)
+  const createdSessionId = (createdSessionEvent?.session as { sessionId: string }).sessionId
+  assert.ok(createdSessionId)
+
+  await runtime.receiveFrontendEvent({
+    type: "USER_MESSAGE",
+    deviceId: "device-001",
+    sessionId: createdSessionId,
+    text: "帮我看一下 3040",
+    sentAt: formatNow(),
+  })
+
+  await new Promise((resolve) => setTimeout(resolve, 600))
+
+  assert.equal(frontendEvents.some((event) => event.type === "RUN_STARTED"), true)
+  assert.equal(frontendEvents.some((event) => event.type === "STEP_STARTED"), true)
+  assert.equal(frontendEvents.some((event) => event.type === "ASSISTANT_DONE"), true)
 
   await runtime.scheduleTimerService.stop()
 })

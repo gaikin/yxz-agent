@@ -1,0 +1,115 @@
+# PROJECT_STATE
+
+更新时间：2026-06-03
+
+## 1. 快照
+
+项目：`yxz-agent`
+
+定位：营小助智能体客户端工程，运行在开阳基座中，提供人工对话、定时任务、事件触发任务、MCP 工具调用和任务记录上报能力。
+
+## 2. HOT 结论
+
+- 正式架构：子进程 + 主窗体 + 任务子窗体 + 确认弹窗。
+- 子进程只负责常驻触发、窗体唤起、平台接入和轻量持久化。
+- 子进程不承担 MCP 工具能力、不执行智能体调度、不上传任务记录。
+- 主窗体承载人工对话类业务会话。
+- 任务子窗体承载定时任务和事件触发任务。
+- 业务窗体内部拆分为执行层和展示层。
+- MCP 调用、任务推进、运行事件、任务记录上传归属业务窗体执行层。
+- 确认弹窗只负责确认或忽略，不执行任务。
+- 事件触发任务结构化脚本由任务子窗体执行层解释执行。
+- `webapp` 已完成独立 Vite 前端工程接入，主窗体工作台已迁入当前仓库。
+- 主窗体最小正式会话链路已打通：`LIST_AGENTS`、`LIST_SESSIONS`、`CREATE_SESSION`、`GET_SESSION_DETAIL`、`USER_MESSAGE`、`CANCEL_RUN` 已可用。
+- 前端执行层骨架已建立：`chat-client`、`stream-parser`、`mcp-client`、`mcp-adapter`、`task-record-uploader` 已落位。
+- 当前子进程里的 `AssistantSessionService` 仍是过渡实现，只提供最小会话存储和模拟回复，不是正式营小助服务接入。
+
+## 3. 技术栈
+
+| 层面 | 当前技术 |
+| --- | --- |
+| 语言 | TypeScript 5.9，JavaScript |
+| 包管理 | npm，`package-lock.json` |
+| 运行环境 | Node.js，浏览器窗体，开阳基座宿主环境 |
+| 前端 | React 19，React Router 7，Vite 7 |
+| UI/状态 | Ant Design 5，styled-components 6，Zustand 5 |
+| 子进程/工具 | Node 服务模块，MCP SDK，Axios，cron-parser |
+| 测试 | Node built-in test runner |
+| 构建 | `tsc`，Vite |
+
+## 4. 目录地图
+
+| 目录 | 作用 |
+| --- | --- |
+| `share/` | 共享协议、宿主类型、路由、时间工具 |
+| `subprocess/service/` | 子进程服务、通道服务、调度服务、MCP 客户端 |
+| `webapp/src/` | React 前端、窗体、执行层事件、组件、状态 |
+| `docs/` | 当前正式设计文档和支撑文档 |
+| `docs/archive/` | 历史草案和旧口径 |
+| `tests/` | Node 测试 |
+| `skills/` | 本地技能示例或配置 |
+
+当前与迁移最相关的目录：
+
+- `webapp/src/pages/Assistant/`：主窗体 runtime 与 service 接线。
+- `webapp/src/assistant/execution-layer/`：新迁入的主窗体执行层骨架。
+- `subprocess/service/chat/`：当前过渡期会话运行时。
+- `tests/webappExecutionLayer.test.ts`：执行层与流式事件回归测试。
+
+## 5. 编码规范
+
+- TypeScript 使用 `strict`，优先显式类型和共享协议类型。
+- 共享协议优先放在 `share/protocol.ts`。
+- 子进程服务以 class 和依赖注入为主，保持可测试。
+- 前端状态优先沿用 Zustand store。
+- UI 优先沿用现有 Ant Design、styled-components 和 app theme。
+- 文档正文遵守 `docs/terminology.md`；旧代码字段可按迁移节奏保留。
+- 修改前必须看 `git status --short`，避免覆盖既有改动。
+
+## 6. 脚本 DSL 状态
+
+- 事件触发任务脚本已正式化为结构化 JSON DSL。
+- 脚本执行归属任务子窗体执行层。
+- 运行时按步骤串行执行，快速失败。
+- 当前不支持步骤并发、自动重试、脚本级总超时。
+- `beforeDelayMs` 可选、不设最大值、必须可取消。
+- 工具结果默认不进入变量上下文。
+- 只有显式声明 `output` 才保存顶层变量。
+- 系统变量当前仅支持 `$_EVENT`。
+- 条件和循环表达式使用 JSON Logic 对象。
+- 缺失变量直接失败，错误码为 `VARIABLE_RESOLVE_FAILED`。
+
+## 7. 风险
+
+| 风险 | 当前处理 |
+| --- | --- |
+| 工作区已有大量未提交变更 | 只修改任务相关文件，不回滚他人改动 |
+| archive 与正式文档并存 | 当前设计以 `docs/formal-docs-index.md` 为准 |
+| 旧术语残留 | 正式文档避免 DCF、Runtime、Channel 正文口径 |
+| 子进程职责膨胀 | 不把 MCP、脚本执行、任务记录上传放回子进程 |
+| 脚本 DSL 仍在落地 | 实现前读 `docs/event-task-script-execution-design.md` |
+| 前端迁移中间态 | 改 UI 前确认当前入口、路由和 store |
+| 主窗体执行层仍有占位实现 | `mcp-client`、`task-record-uploader` 目前只有正式接口骨架，未接真实服务 |
+| 会话运行时仍在子进程过渡承载 | 后续要把真实营小助服务调用和更多执行职责迁回窗体执行层 |
+| 前端构建包偏大 | `vite build` 仍有大 chunk 告警，后续需要拆包 |
+
+## 8. 验证命令
+
+| 命令 | 用途 |
+| --- | --- |
+| `npm run build:subprocess` | 编译 TypeScript |
+| `npm run build:webapp` | 构建前端 |
+| `npm test` | 构建并运行 Node 测试 |
+| `npm run build` | 完整构建 |
+
+当前验证状态：
+
+- `npm test` 通过，当前为 `50/50`。
+- `node --test dist/tests/webappExecutionLayer.test.js` 通过。
+- `npm run build:webapp` 通过，但仍有 chunk size warning。
+
+## 9. 按需扩展
+
+- 架构、重构、发布、排障：读 `.ai/workflows/README.md`。
+- 正式产品或术语：读 `docs/formal-docs-index.md`、`docs/terminology.md`。
+- 脚本 DSL：读事件任务脚本两份正式文档。

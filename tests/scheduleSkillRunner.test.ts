@@ -4,7 +4,7 @@ import {
   ScheduleSkillCatalogService,
   ScheduleSkillExecutionService,
 } from "../subprocess/service/scheduler/SchedulerService"
-import { query3040TodaySkill } from "../subprocess/service/SkillService"
+import { query3040TodaySkill } from "../subprocess/service/execution/skillScriptEngine"
 import type {
   JsonRpcToolCallRequest,
   JsonRpcToolTransport,

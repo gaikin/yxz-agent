@@ -1,8 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { resolveArgs } from "../subprocess/service/SkillService"
+import {
+  resolveTemplateString,
+  resolveTemplateValue,
+} from "../subprocess/service/execution/skillScriptEngine"
 
-test("resolveArgs keeps literals and resolves xxxFrom paths recursively", () => {
+test("resolveTemplateValue keeps literals and resolves templates recursively", () => {
   const values = {
     tabInfo: {
       tabId: "tab_001",
@@ -12,12 +15,12 @@ test("resolveArgs keeps literals and resolves xxxFrom paths recursively", () => 
     },
   }
 
-  const resolved = resolveArgs(
+  const resolved = resolveTemplateValue(
     {
-      tabIdFrom: "tabInfo.tabId",
+      tabId: "{{tabInfo.tabId}}",
       commands: [
         {
-          componentIdFrom: "queryButton.componentId",
+          componentId: "{{queryButton.componentId}}",
           command: "click",
         },
       ],
@@ -36,14 +39,27 @@ test("resolveArgs keeps literals and resolves xxxFrom paths recursively", () => 
   })
 })
 
-test("resolveArgs throws when path cannot be resolved", () => {
+test("resolveTemplateString keeps raw type when string only contains one variable", () => {
+  const resolved = resolveTemplateString("{{result}}", {
+    result: {
+      ok: true,
+    },
+  })
+
+  assert.deepEqual(resolved, {
+    ok: true,
+  })
+})
+
+test("resolveTemplateValue throws when path cannot be resolved", () => {
   assert.throws(() =>
-    resolveArgs(
+    resolveTemplateValue(
       {
-        tabIdFrom: "missing.tabId",
+        tabId: "{{missing.tabId}}",
       },
       {}
-    )
+    ),
+    /变量不存在/
   )
 })
 

@@ -12,6 +12,7 @@
     "test": "npm run build:subprocess && node --test dist/tests/*.test.js",
     "demo:mcp": "node scripts/demo-mcp-tool.js",
     "demo:skill": "npm run build && node scripts/run-local-skill.js",
+    "demo:skill:test-mcp": "npm run build:subprocess && node scripts/run-test-mcp-skill.js",
     "demo:schedule": "node scripts/demo-local-schedule.js",
     "mock:mcp": "node subprocess/schedule/mock-mcp-server.js"
   },
@@ -20,15 +21,16 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.2",
-    "vite": "^7.1.7",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "antd": "^5.27.2",
     "axios": "^1.15.0",
     "cron-parser": "^5.4.0",
-    "react": "^19.0.0",
+    "json-logic-engine": "^5.0.7",
+    "react": ">=18",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.9.4",
     "styled-components": "^6.1.18",

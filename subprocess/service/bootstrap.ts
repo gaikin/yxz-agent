@@ -29,8 +29,8 @@ import {
   type JsonRpcToolTransportFactory,
   type JsonRpcToolTransport,
 } from "./execution/mcpToolClient"
+import { query3040TodaySkill } from "./execution/skillScriptEngine"
 import { loadSkillsFromDirectory } from "./LocalSkillLoader"
-import { query3040TodaySkill } from "./SkillService"
 import type {
   DcfBootstrapRuntimeState,
   ScheduleExecutionOverview,

@@ -1,20 +1,25 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
-  DirectMcpSkillEngine,
+  SkillScriptEngine,
+  SkillScriptEngineError,
   query3040TodaySkill,
-} from "../subprocess/service/SkillService"
+  type SkillScriptDefinition,
+} from "../subprocess/service/execution/skillScriptEngine"
 
-test("direct mcp skill engine iterates steps without tool registry", async () => {
+test("skill script engine executes latest DSL and resolves output templates", async () => {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = []
-  const engine = new DirectMcpSkillEngine({
-    async call(name, args) {
-      calls.push({ name, args })
-      if (name === "openMenu") {
-        return { tabId: "tab_001" }
-      }
-      return { ok: true }
+  const engine = new SkillScriptEngine({
+    mcpToolClient: {
+      async call(name, args) {
+        calls.push({ name, args })
+        if (name === "openMenu") {
+          return { tabId: "tab_001" }
+        }
+        return { ok: true }
+      },
     },
+    now: createTickingClock(),
   })
 
   const result = await engine.run(query3040TodaySkill)
@@ -39,66 +44,305 @@ test("direct mcp skill engine iterates steps without tool registry", async () =>
       },
     },
   ])
-  assert.deepEqual(result, {
-    status: "completed",
-    data: { ok: true },
-    steps: [
+
+  assert.equal(result.status, "completed")
+  if (result.status !== "completed") {
+    return
+  }
+
+  assert.deepEqual(result.data, { ok: true })
+  assert.deepEqual(
+    result.steps.map((step) => ({
+      stepId: step.stepId,
+      stepPath: step.stepPath,
+      status: step.status,
+      outputName: step.outputName,
+    })),
+    [
       {
-        stepId: "open_menu",
-        action: "openMenu",
-        params: {
-          menuShortCode: "3040",
-        },
+        stepId: "openMenu",
+        stepPath: "openMenu",
         status: "completed",
-        result: { tabId: "tab_001" },
+        outputName: "tabInfo",
       },
       {
-        stepId: "execute_query",
-        action: "executePageCommands",
-        params: {
-          tabId: "tab_001",
-          commands: [
-            {
-              componentId: "btn_query_1",
-              command: "click",
-            },
-          ],
-        },
+        stepId: "clickQuery",
+        stepPath: "clickQuery",
         status: "completed",
-        result: { ok: true },
+        outputName: "queryResult",
       },
-    ],
-  })
+    ]
+  )
 })
 
-test("direct mcp skill engine maps call failures to failed result", async () => {
-  const engine = new DirectMcpSkillEngine({
-    async call() {
-      throw new Error("network down")
+test("skill script engine supports group, foreach and evaluate builtins", async () => {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+  const skill: SkillScriptDefinition = {
+    skillId: "demoLoopSkill",
+    skillName: "循环测试",
+    menuCode: "3040",
+    skillVersion: "1.0.0",
+    steps: [
+      {
+        stepId: "calcItems",
+        output: "items",
+        executor: {
+          type: "builtin",
+          toolName: "evaluate",
+        },
+        params: {
+          expression: {
+            var: "$_EVENT.items",
+          },
+        },
+      },
+      {
+        stepId: "submitGroup",
+        type: "group",
+        when: {
+          "==": [{ var: "$_EVENT.enabled" }, true],
+        },
+        steps: [
+          {
+            stepId: "processItems",
+            type: "foreach",
+            foreach: {
+              items: {
+                var: "items",
+              },
+              itemName: "item",
+              maxIterations: 10,
+            },
+            steps: [
+              {
+                stepId: "clickItem",
+                executor: {
+                  type: "mcp",
+                  mcpName: "kaiyang",
+                  toolName: "executePageCommands",
+                },
+                params: {
+                  tabId: "{{$_EVENT.tabId}}",
+                  commands: [
+                    {
+                      componentId: "{{item.componentId}}",
+                      command: "click",
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+
+  const engine = new SkillScriptEngine({
+    mcpToolClient: {
+      async call(name, args) {
+        calls.push({ name, args })
+        return { ok: true }
+      },
+    },
+    now: createTickingClock(),
+  })
+
+  const result = await engine.run(skill, {
+    event: {
+      enabled: true,
+      tabId: "tab_002",
+      items: [
+        { componentId: "btn_1" },
+        { componentId: "btn_2" },
+      ],
     },
   })
 
-  const result = await engine.run(query3040TodaySkill)
+  assert.equal(result.status, "completed")
+  assert.deepEqual(calls, [
+    {
+      name: "executePageCommands",
+      args: {
+        tabId: "tab_002",
+        commands: [
+          {
+            componentId: "btn_1",
+            command: "click",
+          },
+        ],
+      },
+    },
+    {
+      name: "executePageCommands",
+      args: {
+        tabId: "tab_002",
+        commands: [
+          {
+            componentId: "btn_2",
+            command: "click",
+          },
+        ],
+      },
+    },
+  ])
+
+  if (result.status !== "completed") {
+    return
+  }
+
+  assert.deepEqual(
+    result.steps.map((step) => step.stepPath),
+    [
+      "calcItems",
+      "submitGroup.processItems[0].clickItem",
+      "submitGroup.processItems[1].clickItem",
+      "submitGroup.processItems",
+      "submitGroup",
+    ]
+  )
+})
+
+test("skill script engine maps missing variables to VARIABLE_RESOLVE_FAILED", async () => {
+  const engine = new SkillScriptEngine({
+    mcpToolClient: {
+      async call() {
+        return { ok: true }
+      },
+    },
+    now: createTickingClock(),
+  })
+
+  const result = await engine.run({
+    skillId: "missingVarSkill",
+    skillName: "缺失变量测试",
+    menuCode: "3040",
+    skillVersion: "1.0.0",
+    steps: [
+      {
+        stepId: "clickQuery",
+        executor: {
+          type: "mcp",
+          mcpName: "kaiyang",
+          toolName: "executePageCommands",
+        },
+        params: {
+          tabId: "{{missing.tabId}}",
+        },
+      },
+    ],
+  })
 
   assert.deepEqual(result, {
     status: "failed",
     error: {
-      code: "RUNTIME_EXCEPTION",
-      message: "执行过程中发生未预期异常",
+      code: "VARIABLE_RESOLVE_FAILED",
+      message: "变量不存在: missing.tabId",
     },
     steps: [
       {
-        stepId: "open_menu",
-        action: "openMenu",
-        params: {
-          menuShortCode: "3040",
-        },
+        stepId: "clickQuery",
+        stepPath: "clickQuery",
         status: "failed",
-        errorMessage: "执行过程中发生未预期异常",
+        executor: {
+          type: "mcp",
+          mcpName: "kaiyang",
+          toolName: "executePageCommands",
+        },
+        beforeDelayMs: 0,
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:01.000Z",
+        durationMs: 1000,
+        outputName: undefined,
+        result: undefined,
+        error: {
+          code: "VARIABLE_RESOLVE_FAILED",
+          message: "变量不存在: missing.tabId",
+        },
+        reason: undefined,
       },
     ],
   })
 })
 
+test("skill script engine validates definitions before execution", async () => {
+  const engine = new SkillScriptEngine({
+    now: createTickingClock(),
+  })
 
+  await assert.rejects(
+    async () =>
+      engine.run({
+        skillId: "brokenSkill",
+        skillName: "坏脚本",
+        menuCode: "3040",
+        skillVersion: "1.0.0",
+        steps: [
+          {
+            stepId: "bad_step",
+            executor: {
+              type: "builtin",
+              toolName: "wait",
+            },
+            params: {
+              durationMs: 1,
+            },
+          },
+        ],
+      }),
+    (error: unknown) =>
+      error instanceof Error && error.message.includes("Invalid stepId")
+  )
+})
 
+test("skill script engine exposes abort as USER_CANCELED", async () => {
+  const controller = new AbortController()
+  const engine = new SkillScriptEngine({
+    now: createTickingClock(),
+  })
+
+  controller.abort()
+
+  const result = await engine.run(
+    {
+      skillId: "cancelSkill",
+      skillName: "中止测试",
+      menuCode: "3040",
+      skillVersion: "1.0.0",
+      steps: [
+        {
+          stepId: "waitStep",
+          beforeDelayMs: 10,
+          executor: {
+            type: "builtin",
+            toolName: "wait",
+          },
+          params: {
+            durationMs: 1,
+          },
+        },
+      ],
+    },
+    {
+      signal: controller.signal,
+    }
+  )
+
+  assert.equal(result.status, "failed")
+  if (result.status !== "failed") {
+    return
+  }
+
+  assert.equal(result.error.code, "USER_CANCELED")
+})
+
+function createTickingClock(): () => Date {
+  let tick = 0
+  return () => new Date(Date.UTC(2026, 0, 1, 0, 0, tick++))
+}
+
+test("skill script engine normalizes non-engine errors", () => {
+  const error = new SkillScriptEngineError("RUNTIME_EXCEPTION", "boom")
+  assert.equal(error.code, "RUNTIME_EXCEPTION")
+  assert.equal(error.message, "boom")
+})

@@ -71,6 +71,8 @@
 
 - 事件触发任务脚本已正式化为结构化 JSON DSL。
 - 脚本执行归属任务子窗体执行层。
+- 当前仓库已新增可独立引入的脚本执行引擎，入口为 `subprocess/service/execution/skillScriptEngine.ts`。
+- 脚本执行引擎已按职责拆分为小驼峰模块：类型、校验、模板解析、内置工具、示例和错误处理已从主引擎文件拆出。
 - 运行时按步骤串行执行，快速失败。
 - 当前不支持步骤并发、自动重试、脚本级总超时。
 - `beforeDelayMs` 可选、不设最大值、必须可取消。
@@ -79,6 +81,7 @@
 - 系统变量当前仅支持 `$_EVENT`。
 - 条件和循环表达式使用 JSON Logic 对象。
 - 缺失变量直接失败，错误码为 `VARIABLE_RESOLVE_FAILED`。
+- 当前已支持 `group`、`foreach`、`evaluate`、`wait`、`request` 和 `USER_CANCELED`。
 
 ## 7. 风险
 
@@ -93,6 +96,7 @@
 | 主窗体执行层仍有占位实现 | `mcp-client`、`task-record-uploader` 目前只有正式接口骨架，未接真实服务 |
 | 会话运行时仍在子进程过渡承载 | 后续要把真实营小助服务调用和更多执行职责迁回窗体执行层 |
 | 前端构建包偏大 | `vite build` 仍有大 chunk 告警，后续需要拆包 |
+| 脚本执行回显方式容易与 assistant 消息流混淆 | 当前结论是实时只回显任务级摘要，完整步骤明细放历史执行记录，不把每个脚本步骤转成 assistant 文本泡泡 |
 
 ## 8. 验证命令
 
@@ -105,9 +109,10 @@
 
 当前验证状态：
 
-- `npm test` 通过，当前为 `50/50`。
+- `npm test` 通过，当前为 `56/56`。
 - `node --test dist/tests/webappExecutionLayer.test.js` 通过。
 - `npm run build:webapp` 通过，但仍有 chunk size warning。
+- `npm run build:subprocess` 通过。
 - 主窗体独立网页端页面已在浏览器中复测，三栏布局和卡片样式恢复正常。
 
 ## 9. 按需扩展

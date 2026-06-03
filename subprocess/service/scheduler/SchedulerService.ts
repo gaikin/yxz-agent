@@ -8,9 +8,9 @@ import { createId } from "../common/id"
 import { JsonRpcMcpToolClient, type JsonRpcToolTransportFactory } from "../execution/mcpToolClient"
 import {
   DirectMcpSkillEngine,
-  SkillDefinition,
   type SkillExecutionResult,
-} from "../SkillService"
+  type SkillDefinition,
+} from "../execution/skillScriptEngine"
 import {
   type ScheduleDefinition,
   SchedulePendingExecutionService,

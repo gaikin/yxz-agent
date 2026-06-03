@@ -7,7 +7,7 @@ import type {
 } from "../../../share/protocol"
 import { formatDateTime } from "../../../share/dateTime"
 import { RumJsJsonStore, type RumJsCacheApi } from "../common/rumJsJsonStore"
-import type { SkillExecutionResult } from "../SkillService"
+import type { SkillExecutionResult } from "../execution/skillScriptEngine"
 
 export interface ScheduleDefinition {
   scheduleId: string

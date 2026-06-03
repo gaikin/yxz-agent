@@ -1,30 +1,38 @@
 {
   "skillId": "query_3040_today",
-  "name": "3040当日查询",
-  "description": "打开3040并点击查询",
-  "version": 1,
+  "skillName": "3040当日查询",
+  "menuCode": "3040",
+  "skillVersion": "1.0.0",
   "steps": [
     {
-      "stepId": "open_menu",
-      "action": "openMenu",
+      "stepId": "openMenu",
+      "output": "tabInfo",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "kaiyang",
+        "toolName": "openMenu"
+      },
       "params": {
         "menuShortCode": "3040"
-      },
-      "saveAs": "tabInfo"
+      }
     },
     {
-      "stepId": "execute_query",
-      "action": "executePageCommands",
+      "stepId": "clickQuery",
+      "output": "queryResult",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "kaiyang",
+        "toolName": "executePageCommands"
+      },
       "params": {
-        "tabIdFrom": "tabInfo.tabId",
+        "tabId": "{{tabInfo.tabId}}",
         "commands": [
           {
             "componentId": "btn_query_1",
             "command": "click"
           }
         ]
-      },
-      "saveAs": "queryResult"
+      }
     }
   ]
 }

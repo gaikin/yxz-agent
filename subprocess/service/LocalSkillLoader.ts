@@ -1,39 +1,15 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import type { SkillDefinition } from "./SkillService"
-
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return input !== null && typeof input === "object" && !Array.isArray(input)
-}
-
-function assertSkillDefinition(input: unknown, filePath: string): SkillDefinition {
-  if (!isRecord(input)) {
-    throw new Error(`Invalid skill json: ${filePath}`)
-  }
-
-  if (typeof input.skillId !== "string" || input.skillId.length === 0) {
-    throw new Error(`Invalid skillId in ${filePath}`)
-  }
-
-  if (typeof input.name !== "string" || input.name.length === 0) {
-    throw new Error(`Invalid name in ${filePath}`)
-  }
-
-  if (typeof input.version !== "number") {
-    throw new Error(`Invalid version in ${filePath}`)
-  }
-
-  if (!Array.isArray(input.steps)) {
-    throw new Error(`Skill must define steps in ${filePath}`)
-  }
-
-  return input as unknown as SkillDefinition
-}
+import {
+  assertSkillScriptDefinition,
+  type SkillDefinition,
+} from "./execution/skillScriptEngine"
 
 export async function loadSkillFromFile(filePath: string): Promise<SkillDefinition> {
   const raw = await fs.readFile(filePath, "utf-8")
   const parsed = JSON.parse(raw) as unknown
-  return assertSkillDefinition(parsed, filePath)
+  assertSkillScriptDefinition(parsed, filePath)
+  return parsed
 }
 
 export async function loadSkillsFromDirectory(workspaceRoot: string): Promise<SkillDefinition[]> {

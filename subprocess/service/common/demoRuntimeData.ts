@@ -55,29 +55,37 @@ export const DEFAULT_DEMO_RUNTIME_DATA: DemoRuntimeData = {
         },
         steps: [
           {
-            stepId: "open_menu",
-            action: "openMenu",
-            params: {
-              menuShortCode: "3040",
-            },
+            stepId: "openMenu",
+            stepPath: "openMenu",
             status: "completed",
+            executor: {
+              type: "mcp",
+              mcpName: "kaiyang",
+              toolName: "openMenu",
+            },
+            beforeDelayMs: 0,
+            startedAt: "2026-04-08T02:00:00.000Z",
+            finishedAt: "2026-04-08T02:00:01.000Z",
+            durationMs: 1000,
+            outputName: "tabInfo",
             result: {
               tabId: "tab_demo_3040_001",
             },
           },
           {
-            stepId: "execute_query",
-            action: "executePageCommands",
-            params: {
-              tabId: "tab_demo_3040_001",
-              commands: [
-                {
-                  componentId: "btn_query_1",
-                  command: "click",
-                },
-              ],
-            },
+            stepId: "clickQuery",
+            stepPath: "clickQuery",
             status: "completed",
+            executor: {
+              type: "mcp",
+              mcpName: "kaiyang",
+              toolName: "executePageCommands",
+            },
+            beforeDelayMs: 0,
+            startedAt: "2026-04-08T02:00:01.000Z",
+            finishedAt: "2026-04-08T02:00:03.000Z",
+            durationMs: 2000,
+            outputName: "queryResult",
             result: {
               ok: true,
               results: [

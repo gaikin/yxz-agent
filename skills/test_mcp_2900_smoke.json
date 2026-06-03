@@ -1,0 +1,80 @@
+{
+  "skillId": "testMcpMenu2900Smoke",
+  "skillName": "test-mcp 2900 菜单冒烟",
+  "menuCode": "2900",
+  "skillVersion": "1.0.0",
+  "steps": [
+    {
+      "stepId": "openMenu",
+      "output": "pageInfo",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "menuBrowser",
+        "toolName": "openMenu"
+      },
+      "params": {
+        "menu": "{{$_EVENT.menuCode}}"
+      }
+    },
+    {
+      "stepId": "fillProjectName",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "menuBrowser",
+        "toolName": "fillElement"
+      },
+      "params": {
+        "selector": "#projectName",
+        "value": "{{$_EVENT.projectName}}"
+      }
+    },
+    {
+      "stepId": "selectCategory",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "menuBrowser",
+        "toolName": "selectOption"
+      },
+      "params": {
+        "selector": "#category",
+        "value": "{{$_EVENT.category}}"
+      }
+    },
+    {
+      "stepId": "toggleEnabled",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "menuBrowser",
+        "toolName": "setCheckbox"
+      },
+      "params": {
+        "selector": "#enabled",
+        "checked": "{{$_EVENT.enabled}}"
+      }
+    },
+    {
+      "stepId": "clickSave",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "menuBrowser",
+        "toolName": "clickElement"
+      },
+      "params": {
+        "selector": "#saveButton"
+      }
+    },
+    {
+      "stepId": "readResult",
+      "output": "resultText",
+      "executor": {
+        "type": "mcp",
+        "mcpName": "menuBrowser",
+        "toolName": "getElementText"
+      },
+      "params": {
+        "selector": "#result",
+        "mode": "text"
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+import type { SkillScriptDefinition } from "./skillScriptTypes"
+
+export const query3040TodaySkill: SkillScriptDefinition = {
+  skillId: "query_3040_today",
+  skillName: "3040当日查询",
+  menuCode: "3040",
+  skillVersion: "1.0.0",
+  steps: [
+    {
+      stepId: "openMenu",
+      output: "tabInfo",
+      executor: {
+        type: "mcp",
+        mcpName: "kaiyang",
+        toolName: "openMenu",
+      },
+      params: {
+        menuShortCode: "3040",
+      },
+    },
+    {
+      stepId: "clickQuery",
+      output: "queryResult",
+      executor: {
+        type: "mcp",
+        mcpName: "kaiyang",
+        toolName: "executePageCommands",
+      },
+      params: {
+        tabId: "{{tabInfo.tabId}}",
+        commands: [
+          {
+            componentId: "btn_query_1",
+            command: "click",
+          },
+        ],
+      },
+    },
+  ],
+}

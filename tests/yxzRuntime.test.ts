@@ -263,6 +263,88 @@ test("assistant window service can trigger current schedule through BridgeJs cha
   }
 })
 
+test("assistant window service runs the main conversation flow without host bridge", async () => {
+  const originalFetch = globalThis.fetch
+  const originalRuntimeConfig = globalThis.__YXZ_WEBAPP_CONFIG__
+  const encoder = new TextEncoder()
+
+  globalThis.__YXZ_WEBAPP_CONFIG__ = {
+    assistantCreateUrl: "http://standalone.test/api/conversations/create",
+    assistantStreamUrl: "http://standalone.test/api/conversations/:conversationId/stream",
+    assistantReportUrl: "http://standalone.test/api/conversations/:conversationId/report",
+    mcpBaseUrl: "",
+  }
+
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.toString()
+    if (url === "http://standalone.test/api/conversations/create") {
+      return new Response(JSON.stringify({ conversationId: "conv-web-1" }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+    }
+
+    if (url === "http://standalone.test/api/conversations/conv-web-1/stream") {
+      assert.equal(init?.method, "POST")
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode('data: {"type":"STREAMING_TEXT","content":"网页端已直连执行层。"}\n\n')
+          )
+          controller.enqueue(encoder.encode('data: {"type":"COMPLETE"}\n\n'))
+          controller.close()
+        },
+      })
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream",
+        },
+      })
+    }
+
+    if (url === "http://standalone.test/api/conversations/conv-web-1/report") {
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+    }
+
+    throw new Error(`Unexpected fetch request: ${url}`)
+  }
+
+  try {
+    const service = new AssistantWindowService("device-standalone")
+    await service.syncWorkspace()
+
+    const draftSessionId = service.getRuntime().chatStore.getState().activeSessionId
+    await service.sendMessage(draftSessionId, "你好")
+
+    const runtime = service.getRuntime()
+    const activeSession = runtime.chatStore
+      .getState()
+      .sessions.find((session) => session.sessionId === runtime.chatStore.getState().activeSessionId)
+
+    assert.ok(activeSession)
+    assert.equal(activeSession?.sessionId, "conv-web-1")
+    assert.equal(activeSession?.source, "web")
+    assert.equal(
+      activeSession?.messages.some(
+        (message) => message.role === "assistant" && message.text.includes("网页端已直连执行层")
+      ),
+      true
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+    globalThis.__YXZ_WEBAPP_CONFIG__ = originalRuntimeConfig
+  }
+})
+
 test("dcf runtime service initializes and handles request-event actions", async () => {
   const openedWindows: Array<{
     x: number

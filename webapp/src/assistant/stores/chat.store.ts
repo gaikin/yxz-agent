@@ -19,7 +19,7 @@ import { formatDisplayTime, formatNow } from "../../shared/utils/dateTime"
 import { defaultAgents, welcomeMessages } from "../dev-fixtures/agentWorkspace"
 import type { ChatMessage, ChatMessageVariant } from "../types/chat"
 
-type SessionSource = "fixture" | "draft" | "backend"
+type SessionSource = "draft" | "web"
 
 export interface AssistantSessionItem {
   sessionId: string
@@ -49,7 +49,8 @@ export interface ChatStoreState {
   appendLocalSystemMessage: (
     sessionId: string,
     text: string,
-    variant?: ChatMessageVariant
+    variant?: ChatMessageVariant,
+    card?: ChatMessage["card"]
   ) => void
   applyAgentSnapshot: (event: FrontendAgentSnapshotEvent) => void
   applySessionSnapshot: (event: FrontendSessionSnapshotEvent) => void
@@ -80,35 +81,18 @@ function createSystemMessage(text: string, variant: ChatMessageVariant = "defaul
   }
 }
 
-function placeholderSession(): AssistantSessionItem {
-  return {
-    sessionId: "fixture-main-session",
-    title: "迁移后的主窗体",
-    preview: "工作台骨架已接入当前项目",
-    updatedAt: formatDisplayTime(formatNow()),
-    conversationId: null,
-    agentName: defaultAgents[0]?.agentName,
-    lastRunStatus: "idle",
-    runtimeStatus: "等待正式会话接入",
-    source: "fixture",
-    messages: welcomeMessages.map((item) => ({ ...item })),
-  }
-}
-
 function draftSession(agentName?: string): AssistantSessionItem {
   return {
     sessionId: createId("draft-session"),
     title: "新对话",
-    preview: "等待第一条正式业务消息",
+    preview: "等待发送第一条消息",
     updatedAt: formatDisplayTime(formatNow()),
     conversationId: null,
     agentName,
     lastRunStatus: "idle",
-    runtimeStatus: "草稿会话",
+    runtimeStatus: "等待发送",
     source: "draft",
-    messages: [
-      createSystemMessage("当前会话已创建为主窗体草稿，正式执行链路将在后续阶段接入。"),
-    ],
+    messages: welcomeMessages.map((item) => ({ ...item })),
   }
 }
 
@@ -152,7 +136,7 @@ function fromSummary(summary: SessionSummary, previous?: AssistantSessionItem): 
         : summary.lastRunStatus === "failed"
           ? "执行失败"
           : "在线待命",
-    source: "backend",
+    source: "web",
     messages: previous?.messages ?? [],
   }
 }
@@ -170,7 +154,7 @@ function fromDetail(detail: SessionDetail): AssistantSessionItem {
     agentName: detail.agent.agentName,
     lastRunStatus: detail.lastRun?.status === "failed" ? "failed" : "idle",
     runtimeStatus: detail.lastRun?.status === "running" ? "执行中" : "在线待命",
-    source: "backend",
+    source: "web",
     messages,
   }
 }
@@ -208,7 +192,7 @@ function ensureSession(
       conversationId: sessionId,
       lastRunStatus: "running",
       runtimeStatus: "执行中",
-      source: "backend",
+      source: "web",
       messages: [],
     },
     ...sessions,
@@ -248,7 +232,7 @@ function upsertAssistantMessage(
 }
 
 export function createChatStore(): ChatStoreApi {
-  const initialSession = placeholderSession()
+  const initialSession = draftSession(defaultAgents[0]?.agentName)
 
   return createStore<ChatStoreState>()((set) => ({
     agents: defaultAgents,
@@ -293,10 +277,19 @@ export function createChatStore(): ChatStoreApi {
           }
         }),
       })),
-    appendLocalSystemMessage: (sessionId, text, variant = "default") =>
+    appendLocalSystemMessage: (sessionId, text, variant = "default", card) =>
       set((state) => ({
         sessions: patchSession(state.sessions, sessionId, (session) => {
-          const messages = [...session.messages, createSystemMessage(text, variant)]
+          const systemMessage = createSystemMessage(text, variant)
+          const messages = [
+            ...session.messages,
+            card
+              ? {
+                  ...systemMessage,
+                  card,
+                }
+              : systemMessage,
+          ]
           return {
             ...session,
             preview: derivePreview(messages),

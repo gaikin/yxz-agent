@@ -102,7 +102,7 @@ const TagRow = styled.div`
   flex-wrap: wrap;
 `
 
-const RunningTag = styled.span<{ $tone?: "running" | "draft" | "fixture" }>`
+const RunningTag = styled.span<{ $tone?: "running" | "draft" }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -111,15 +111,11 @@ const RunningTag = styled.span<{ $tone?: "running" | "draft" | "fixture" }>`
   background: ${({ $tone }) =>
     $tone === "draft"
       ? "rgba(255, 214, 107, 0.14)"
-      : $tone === "fixture"
-        ? "rgba(126, 182, 255, 0.14)"
-        : "rgba(107, 212, 161, 0.14)"};
+      : "rgba(107, 212, 161, 0.14)"};
   color: ${({ $tone, theme }) =>
     $tone === "draft"
       ? theme.colors.warning
-      : $tone === "fixture"
-        ? "#9dc4ff"
-        : theme.colors.success};
+      : theme.colors.success};
   font-size: 0.78rem;
   font-weight: 600;
 `
@@ -159,9 +155,6 @@ export function HistorySessionList({
               <TagRow>
                 {session.runtimeStatus === "执行中" ? <RunningTag>运行中</RunningTag> : null}
                 {session.source === "draft" ? <RunningTag $tone="draft">草稿</RunningTag> : null}
-                {session.source === "fixture" ? (
-                  <RunningTag $tone="fixture">已迁移</RunningTag>
-                ) : null}
                 <TimeText>{session.updatedAt}</TimeText>
               </TagRow>
             </HistoryItemTop>

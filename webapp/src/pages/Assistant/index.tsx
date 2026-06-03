@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react"
+import { message as antdMessage } from "antd"
 import { MainWindowPage } from "../../assistant/pages/MainWindowPage"
 import { resolveSessionAgentId } from "../../assistant/execution-layer/chat/chat-client"
 import { AppProviders } from "../../providers/AppProviders"
@@ -35,7 +36,7 @@ export class AssistantWindowService {
   }
 
   async syncState(): Promise<void> {
-    await this.runtime.channelClient.requestScheduleState()
+    await this.runtime.hostClient.requestScheduleState()
   }
 
   async syncWorkspace(): Promise<void> {
@@ -43,12 +44,15 @@ export class AssistantWindowService {
   }
 
   async confirmAutomationAuthorization(): Promise<void> {
-    await this.runtime.channelClient.authorizeAutomation()
+    const handled = await this.runtime.hostClient.authorizeAutomation()
+    if (!handled) {
+      void antdMessage.info("当前是独立网页端模式，未连接宿主调度能力。")
+    }
   }
 
   async openSchedulePanel(): Promise<void> {
     this.runtime.scheduleStore.getState().openPanel()
-    await this.runtime.channelClient.requestScheduleState()
+    await this.runtime.hostClient.requestScheduleState()
   }
 
   closeSchedulePanel(): void {
@@ -60,7 +64,10 @@ export class AssistantWindowService {
     if (!schedule) {
       return
     }
-    await this.runtime.channelClient.enableSchedule(schedule.scheduleId)
+    const handled = await this.runtime.hostClient.enableSchedule(schedule.scheduleId)
+    if (!handled) {
+      void antdMessage.info("当前是独立网页端模式，未连接宿主调度能力。")
+    }
   }
 
   async disableSchedule(): Promise<void> {
@@ -68,14 +75,20 @@ export class AssistantWindowService {
     if (!schedule) {
       return
     }
-    await this.runtime.channelClient.disableSchedule(schedule.scheduleId)
+    const handled = await this.runtime.hostClient.disableSchedule(schedule.scheduleId)
+    if (!handled) {
+      void antdMessage.info("当前是独立网页端模式，未连接宿主调度能力。")
+    }
   }
 
   async triggerCurrentScheduleNow(): Promise<boolean> {
     const scheduleId =
       this.runtime.scheduleStore.getState().schedule?.scheduleId ?? "schedule_3040_daily"
-    await this.runtime.channelClient.triggerSchedule(scheduleId)
-    return true
+    const handled = await this.runtime.hostClient.triggerSchedule(scheduleId)
+    if (!handled) {
+      void antdMessage.info("当前是独立网页端模式，未连接宿主调度能力。")
+    }
+    return handled
   }
 
   async loadSessionDetail(sessionId: string): Promise<void> {
@@ -83,18 +96,29 @@ export class AssistantWindowService {
   }
 
   async createSession(): Promise<void> {
-    const state = this.runtime.chatStore.getState()
-    const agentId = resolveSessionAgentId(state.agents, state.activeAgentId)
-    if (!agentId) {
-      return
-    }
-    await this.runtime.chatClient.createSession(agentId)
+    this.runtime.chatStore.getState().createLocalDraftSession()
   }
 
   async sendMessage(sessionId: string, text: string): Promise<void> {
-    this.runtime.chatStore.getState().appendLocalUserMessage(sessionId, text)
+    const state = this.runtime.chatStore.getState()
+    const session = state.sessions.find((item) => item.sessionId === sessionId)
+    const trimmed = text.trim()
+    if (!trimmed || !session) {
+      return
+    }
+
+    let targetSessionId = sessionId
+    if (session.source === "draft") {
+      const agentId = resolveSessionAgentId(state.agents, state.activeAgentId)
+      if (!agentId) {
+        return
+      }
+      targetSessionId = await this.runtime.chatClient.createSession(agentId)
+    }
+
+    this.runtime.chatStore.getState().appendLocalUserMessage(targetSessionId, trimmed)
     this.runtime.chatStore.getState().setDraft("")
-    await this.runtime.chatClient.sendMessage(sessionId, text)
+    await this.runtime.chatClient.sendMessage(targetSessionId, trimmed)
   }
 
   async abortRun(sessionId: string, runId: string): Promise<void> {

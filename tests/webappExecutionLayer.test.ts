@@ -40,6 +40,7 @@ test("assistant chat client syncs workspace and tracks stream snapshots", async 
     },
     async createSession(agentId: string) {
       calls.push(`createSession:${agentId}`)
+      return "session-created"
     },
     async sendUserMessage(sessionId: string, text: string) {
       calls.push(`sendUserMessage:${sessionId}:${text}`)

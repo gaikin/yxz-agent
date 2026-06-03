@@ -7,7 +7,7 @@ export const welcomeMessages: ChatMessage[] = [
     role: "system",
     author: "系统提示",
     time: "09:00",
-    text: "你好，这里是营小助。主窗体工作台已经迁入当前项目。",
+    text: "你好，这里是营小助。",
     status: "done",
   },
   {
@@ -15,7 +15,7 @@ export const welcomeMessages: ChatMessage[] = [
     role: "assistant",
     author: "营小助",
     time: "09:01",
-    text: "当前版本已接入正式工作台骨架、调度入口和运行状态区，人工对话执行层将在下一阶段接入。",
+    text: "当前主窗体以独立网页端运行，人工对话主流程会直接连接网页端执行层。",
     status: "done",
   },
 ]

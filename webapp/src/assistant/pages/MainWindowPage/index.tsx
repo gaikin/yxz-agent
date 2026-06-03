@@ -1,4 +1,3 @@
-import { message as antdMessage } from "antd"
 import { useEffect } from "react"
 import { useStore } from "zustand"
 import type { AssistantWindowRuntime, AssistantWindowViewModel } from "../../../pages/Assistant/runtime"
@@ -46,10 +45,6 @@ export function MainWindowPage({
   const draft = useStore(runtime.chatStore, (state) => state.draft)
   const setDraft = useStore(runtime.chatStore, (state) => state.setDraft)
   const activateSession = useStore(runtime.chatStore, (state) => state.activateSession)
-  const appendLocalSystemMessage = useStore(
-    runtime.chatStore,
-    (state) => state.appendLocalSystemMessage
-  )
   const activeRunCount = useStore(runtime.runStore, (state) => state.activeRunCount)
   const activeRun = useStore(runtime.runStore, (state) =>
     activeSessionId ? state.runsBySessionId[activeSessionId] : undefined
@@ -62,16 +57,11 @@ export function MainWindowPage({
     void onSyncWorkspace()
   }, [onSyncWorkspace])
 
-  const composerHint =
-    activeSession?.source === "backend"
-      ? "按 Ctrl + Enter 或 Cmd + Enter 发送。"
-      : "点击“新建对话”可创建正式业务会话；调度与确认弹窗链路仍保持可用。"
+  const composerHint = "按 Ctrl + Enter 或 Cmd + Enter 发送。主流程以独立网页端执行，宿主调度能力按需增强。"
 
   const handleSelectSession = (session: AssistantSessionItem) => {
     activateSession(session.sessionId)
-    if (session.source === "backend") {
-      void onLoadSessionDetail(session.sessionId)
-    }
+    void onLoadSessionDetail(session.sessionId)
   }
 
   const handleCreateSession = async () => {
@@ -84,22 +74,11 @@ export function MainWindowPage({
       return
     }
 
-    if (activeSession.source !== "backend") {
-      await onCreateSession()
-      appendLocalSystemMessage(
-        activeSession.sessionId,
-        "已请求创建正式业务会话。会话创建完成后，请再次发送这条消息。",
-        "action"
-      )
-      void antdMessage.info("正在创建正式会话，请在新会话出现后再次发送。")
-      return
-    }
-
     await onSendMessage(activeSession.sessionId, trimmed)
   }
 
   const handleAbort = async () => {
-    if (!activeSession || !activeRun || activeSession.source !== "backend") {
+    if (!activeSession || !activeRun) {
       return
     }
     await onAbort(activeSession.sessionId, activeRun.runId)

@@ -22,6 +22,7 @@
 - `webapp` 已完成独立 Vite 前端工程接入，主窗体工作台已迁入当前仓库。
 - 主窗体最小正式会话链路已打通：`LIST_AGENTS`、`LIST_SESSIONS`、`CREATE_SESSION`、`GET_SESSION_DETAIL`、`USER_MESSAGE`、`CANCEL_RUN` 已可用。
 - 前端执行层骨架已建立：`chat-client`、`stream-parser`、`mcp-client`、`mcp-adapter`、`task-record-uploader` 已落位。
+- 主窗体独立网页端布局样式已恢复；`styled-components` 的全局样式不再通过 `@import` 注入字体，字体改由 `webapp/index.html` 加载。
 - 当前子进程里的 `AssistantSessionService` 仍是过渡实现，只提供最小会话存储和模拟回复，不是正式营小助服务接入。
 
 ## 3. 技术栈
@@ -107,6 +108,7 @@
 - `npm test` 通过，当前为 `50/50`。
 - `node --test dist/tests/webappExecutionLayer.test.js` 通过。
 - `npm run build:webapp` 通过，但仍有 chunk size warning。
+- 主窗体独立网页端页面已在浏览器中复测，三栏布局和卡片样式恢复正常。
 
 ## 9. 按需扩展
 

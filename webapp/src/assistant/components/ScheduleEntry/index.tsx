@@ -58,6 +58,12 @@ const ActionStack = styled.div`
   gap: 0.65rem;
 `
 
+const Hint = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  line-height: 1.6;
+`
+
 const ActionButton = styled.button<{ $tone?: "secondary" | "warning" }>`
   min-height: 44px;
   border: ${({ $tone }) =>
@@ -93,6 +99,10 @@ export function ScheduleEntry({
 
       <MetaGrid>
         <MetaRow>
+          <span>宿主连接</span>
+          <strong>{viewModel.isHostConnected ? "已连接" : "未连接"}</strong>
+        </MetaRow>
+        <MetaRow>
           <span>自动执行授权</span>
           <strong>
             {viewModel.automationAuthorization.authorized ? "authorized" : "unauthorized"}
@@ -109,17 +119,23 @@ export function ScheduleEntry({
       </MetaGrid>
 
       <ActionStack>
+        {!viewModel.isHostConnected ? (
+          <Hint>当前以独立网页端运行。人工对话主流程可直接使用，定时任务与确认弹窗需要连接宿主后才可用。</Hint>
+        ) : null}
+
         {viewModel.shouldShowAutomationAuthorization ? (
           <ActionButton type="button" onClick={onAuthorize}>
             确认自动执行授权
           </ActionButton>
         ) : null}
 
-        {!viewModel.panelVisible ? (
+        {viewModel.isHostConnected && !viewModel.panelVisible ? (
           <ActionButton type="button" $tone="secondary" onClick={onOpenPanel}>
             打开定时任务面板
           </ActionButton>
-        ) : (
+        ) : null}
+
+        {viewModel.isHostConnected && viewModel.panelVisible ? (
           <>
             <ActionButton
               type="button"
@@ -143,7 +159,7 @@ export function ScheduleEntry({
               收起任务面板
             </ActionButton>
           </>
-        )}
+        ) : null}
       </ActionStack>
     </Panel>
   )

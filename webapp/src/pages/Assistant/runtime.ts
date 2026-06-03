@@ -1,47 +1,38 @@
 import type {
   DcfToFrontendEvent,
-  FrontendAgentSnapshotEvent,
-  FrontendAssistantDoneEvent,
-  FrontendAssistantDeltaEvent,
   FrontendAutomationAuthorizedEvent,
+  FrontendAuthorizeAutomationEvent,
   FrontendBootstrapStateEvent,
-  FrontendCancelRunEvent,
-  FrontendCreateSessionEvent,
-  FrontendGetSessionDetailEvent,
-  FrontendListAgentsEvent,
-  FrontendListSessionsEvent,
-  FrontendRunCancelledEvent,
-  FrontendRunFailedEvent,
-  FrontendRunStartedEvent,
   FrontendScheduleDisableEvent,
   FrontendScheduleDisabledEvent,
   FrontendScheduleEnableEvent,
   FrontendScheduleEnabledEvent,
   FrontendScheduleStateEvent,
   FrontendScheduleStateSnapshotEvent,
-  FrontendSessionCreatedEvent,
-  FrontendSessionDetailEvent,
-  FrontendSessionSnapshotEvent,
-  FrontendStepFinishedEvent,
-  FrontendStepStartedEvent,
   FrontendTriggerScheduleEvent,
-  FrontendUserMessageEvent,
 } from "../../../../share/protocol"
+import { AssistantChatClient } from "../../assistant/execution-layer/chat/chat-client"
+import { AssistantWebRuntimeTransport } from "../../assistant/execution-layer/chat/web-runtime-transport"
+import { RuntimeEventDispatcher } from "../../assistant/execution-layer/events/runtime-event-dispatcher"
+import { createBrowserMcpExecutor } from "../../assistant/execution-layer/mcp/browser-mcp-executor"
 import { AssistantMcpClient } from "../../assistant/execution-layer/mcp/mcp-client"
 import { TaskRecordUploader } from "../../assistant/execution-layer/records/task-record-uploader"
-import { AssistantChatClient } from "../../assistant/execution-layer/chat/chat-client"
-import { RuntimeEventDispatcher } from "../../assistant/execution-layer/events/runtime-event-dispatcher"
 import type { ChatStoreApi } from "../../assistant/stores/chat.store"
 import { createChatStore } from "../../assistant/stores/chat.store"
 import type { RunStoreApi } from "../../assistant/stores/run.store"
 import { createRunStore } from "../../assistant/stores/run.store"
-import type {
-  ScheduleStoreApi,
-  ScheduleStoreState,
-} from "../../assistant/stores/schedule.store"
+import type { ScheduleStoreState } from "../../assistant/stores/schedule.store"
 import { createScheduleStore } from "../../assistant/stores/schedule.store"
 import { formatNow } from "../../shared/utils/dateTime"
 import { KaiyangBaseCommunicationService } from "../../services/kaiyang-base-communication"
+
+const HOST_EVENT_TYPES = new Set<string>([
+  "BOOTSTRAP_STATE",
+  "AUTOMATION_AUTHORIZED",
+  "SCHEDULE_STATE_SNAPSHOT",
+  "SCHEDULE_ENABLED",
+  "SCHEDULE_DISABLED",
+])
 
 export type { ScheduleStoreState } from "../../assistant/stores/schedule.store"
 
@@ -52,6 +43,7 @@ export interface AssistantWindowViewModel {
   panelVisible: ScheduleStoreState["panelVisible"]
   shouldShowAutomationAuthorization: boolean
   canOperateSchedule: boolean
+  isHostConnected: boolean
 }
 
 export interface AssistantWindowRuntime {
@@ -59,7 +51,7 @@ export interface AssistantWindowRuntime {
   chatStore: ChatStoreApi
   runStore: RunStoreApi
   runtimeEventDispatcher: RuntimeEventDispatcher
-  channelClient: AssistantWindowChannelClient
+  hostClient: AssistantHostClient
   chatClient: AssistantChatClient
   mcpClient: AssistantMcpClient
   taskRecordUploader: TaskRecordUploader
@@ -105,7 +97,7 @@ export class ScheduleStore {
   }
 }
 
-export class AssistantWindowChannelClient {
+export class AssistantHostClient {
   private readonly communication = new KaiyangBaseCommunicationService()
 
   constructor(
@@ -113,29 +105,56 @@ export class AssistantWindowChannelClient {
     private readonly channel = "assistant_window"
   ) {}
 
-  bindEvents(listener: (event: DcfToFrontendEvent) => void): void {
-    this.communication.listenJson(this.channel, listener)
+  isAvailable(): boolean {
+    return Boolean(globalThis.BridgeJs ?? globalThis.BridgeJS)
   }
 
-  async authorizeAutomation(): Promise<void> {
+  bindEvents(listener: (event: DcfToFrontendEvent) => void): void {
+    if (!this.isAvailable()) {
+      return
+    }
+
+    this.communication.listenJson<DcfToFrontendEvent>(this.channel, (event) => {
+      if (!HOST_EVENT_TYPES.has(event.type)) {
+        return
+      }
+      listener(event)
+    })
+  }
+
+  async authorizeAutomation(): Promise<boolean> {
+    if (!this.isAvailable()) {
+      return false
+    }
+
     const event = {
       type: "AUTHORIZE_AUTOMATION",
       deviceId: this.deviceId,
       sentAt: formatNow(),
     } satisfies FrontendAuthorizeAutomationEvent
     await this.communication.sendJson(this.channel, event)
+    return true
   }
 
-  async requestScheduleState(): Promise<void> {
+  async requestScheduleState(): Promise<boolean> {
+    if (!this.isAvailable()) {
+      return false
+    }
+
     const event = {
       type: "SCHEDULE_STATE",
       deviceId: this.deviceId,
       sentAt: formatNow(),
     } satisfies FrontendScheduleStateEvent
     await this.communication.sendJson(this.channel, event)
+    return true
   }
 
-  async enableSchedule(scheduleId: string): Promise<void> {
+  async enableSchedule(scheduleId: string): Promise<boolean> {
+    if (!this.isAvailable()) {
+      return false
+    }
+
     const event = {
       type: "SCHEDULE_ENABLE",
       deviceId: this.deviceId,
@@ -143,9 +162,14 @@ export class AssistantWindowChannelClient {
       sentAt: formatNow(),
     } satisfies FrontendScheduleEnableEvent
     await this.communication.sendJson(this.channel, event)
+    return true
   }
 
-  async disableSchedule(scheduleId: string): Promise<void> {
+  async disableSchedule(scheduleId: string): Promise<boolean> {
+    if (!this.isAvailable()) {
+      return false
+    }
+
     const event = {
       type: "SCHEDULE_DISABLE",
       deviceId: this.deviceId,
@@ -153,9 +177,14 @@ export class AssistantWindowChannelClient {
       sentAt: formatNow(),
     } satisfies FrontendScheduleDisableEvent
     await this.communication.sendJson(this.channel, event)
+    return true
   }
 
-  async triggerSchedule(scheduleId: string, requestedAt?: string): Promise<void> {
+  async triggerSchedule(scheduleId: string, requestedAt?: string): Promise<boolean> {
+    if (!this.isAvailable()) {
+      return false
+    }
+
     const event = {
       type: "TRIGGER_SCHEDULE",
       deviceId: this.deviceId,
@@ -164,91 +193,59 @@ export class AssistantWindowChannelClient {
       sentAt: formatNow(),
     } satisfies FrontendTriggerScheduleEvent
     await this.communication.sendJson(this.channel, event)
+    return true
   }
-
-  async listAgents(): Promise<void> {
-    const event = {
-      type: "LIST_AGENTS",
-      deviceId: this.deviceId,
-      sentAt: formatNow(),
-    } satisfies FrontendListAgentsEvent
-    await this.communication.sendJson(this.channel, event)
-  }
-
-  async listSessions(): Promise<void> {
-    const event = {
-      type: "LIST_SESSIONS",
-      deviceId: this.deviceId,
-      sentAt: formatNow(),
-    } satisfies FrontendListSessionsEvent
-    await this.communication.sendJson(this.channel, event)
-  }
-
-  async getSessionDetail(sessionId: string): Promise<void> {
-    const event = {
-      type: "GET_SESSION_DETAIL",
-      deviceId: this.deviceId,
-      sessionId,
-      sentAt: formatNow(),
-    } satisfies FrontendGetSessionDetailEvent
-    await this.communication.sendJson(this.channel, event)
-  }
-
-  async createSession(agentId: string): Promise<void> {
-    const event = {
-      type: "CREATE_SESSION",
-      deviceId: this.deviceId,
-      agentId,
-      sentAt: formatNow(),
-    } satisfies FrontendCreateSessionEvent
-    await this.communication.sendJson(this.channel, event)
-  }
-
-  async sendUserMessage(sessionId: string, text: string): Promise<void> {
-    const event = {
-      type: "USER_MESSAGE",
-      deviceId: this.deviceId,
-      sessionId,
-      text,
-      sentAt: formatNow(),
-    } satisfies FrontendUserMessageEvent
-    await this.communication.sendJson(this.channel, event)
-  }
-
-  async cancelRun(sessionId: string, runId: string): Promise<void> {
-    const event = {
-      type: "CANCEL_RUN",
-      deviceId: this.deviceId,
-      sessionId,
-      runId,
-      sentAt: formatNow(),
-    } satisfies FrontendCancelRunEvent
-    await this.communication.sendJson(this.channel, event)
-  }
-}
-
-type FrontendAuthorizeAutomationEvent = {
-  type: "AUTHORIZE_AUTOMATION"
-  deviceId: string
-  sentAt: string
 }
 
 export function bootstrapAssistantWindow(deviceId = "device-001"): AssistantWindowRuntime {
-  const channelClient = new AssistantWindowChannelClient(deviceId)
+  const scheduleStore = new ScheduleStore()
+  const chatStore = createChatStore()
+  const runStore = createRunStore()
+  const runtimeEventDispatcher = new RuntimeEventDispatcher()
+  const hostClient = new AssistantHostClient(deviceId)
+  const taskRecordUploader = new TaskRecordUploader()
+  const mcpClient = new AssistantMcpClient(createBrowserMcpExecutor())
+
   const runtime: AssistantWindowRuntime = {
-    scheduleStore: new ScheduleStore(),
-    chatStore: createChatStore(),
-    runStore: createRunStore(),
-    runtimeEventDispatcher: new RuntimeEventDispatcher(),
-    channelClient,
-    chatClient: new AssistantChatClient(channelClient),
-    mcpClient: new AssistantMcpClient(),
-    taskRecordUploader: new TaskRecordUploader(),
+    scheduleStore,
+    chatStore,
+    runStore,
+    runtimeEventDispatcher,
+    hostClient,
+    chatClient: undefined as unknown as AssistantChatClient,
+    mcpClient,
+    taskRecordUploader,
   }
 
-  runtime.channelClient.bindEvents((event) => {
+  const chatTransport = new AssistantWebRuntimeTransport(
+    deviceId,
+    (event) => applyAssistantWindowEvent(runtime, event),
+    chatStore,
+    mcpClient,
+    taskRecordUploader,
+    hostClient
+  )
+
+  runtime.chatClient = new AssistantChatClient(chatTransport)
+
+  hostClient.bindEvents((event) => {
     applyAssistantWindowEvent(runtime, event)
   })
+
+  if (!hostClient.isAvailable()) {
+    scheduleStore.handleBootstrapState({
+      type: "BOOTSTRAP_STATE",
+      deviceId,
+      automationAuthorization: {
+        authorized: false,
+      },
+      dcfRuntime: {
+        dcfStatus: "error",
+        scheduleSubsystemReady: false,
+      },
+      sentAt: formatNow(),
+    })
+  }
 
   return runtime
 }
@@ -257,7 +254,7 @@ export function applyAssistantWindowEvent(
   runtime: AssistantWindowRuntime,
   event: DcfToFrontendEvent
 ): void {
-  runtime.chatClient.handleFrontendEvent(event)
+  runtime.chatClient?.handleFrontendEvent(event)
 
   switch (event.type) {
     case "BOOTSTRAP_STATE":
@@ -320,18 +317,21 @@ export function applyAssistantWindowEvent(
 export function createAssistantWindowViewModel(
   state: ScheduleStoreState
 ): AssistantWindowViewModel {
+  const isHostConnected = state.bootstrapState?.dcfStatus === "online"
+
   return {
     bootstrapState: state.bootstrapState,
     automationAuthorization: state.automationAuthorization,
     schedule: state.schedule,
     panelVisible: state.panelVisible,
     shouldShowAutomationAuthorization:
-      state.bootstrapState?.dcfStatus === "online" &&
+      isHostConnected &&
       state.bootstrapState?.scheduleSubsystemReady === true &&
       state.automationAuthorization.authorized === false,
     canOperateSchedule:
-      state.bootstrapState?.dcfStatus === "online" &&
+      isHostConnected &&
       state.bootstrapState?.scheduleSubsystemReady === true &&
       state.automationAuthorization.authorized === true,
+    isHostConnected,
   }
 }

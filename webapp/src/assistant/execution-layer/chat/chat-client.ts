@@ -11,7 +11,7 @@ export interface AssistantChatTransport {
   listAgents(): Promise<void>
   listSessions(): Promise<void>
   getSessionDetail(sessionId: string): Promise<void>
-  createSession(agentId: string): Promise<void>
+  createSession(agentId: string): Promise<string>
   sendUserMessage(sessionId: string, text: string): Promise<void>
   cancelRun(sessionId: string, runId: string): Promise<void>
 }
@@ -33,8 +33,8 @@ export class AssistantChatClient {
     await this.transport.getSessionDetail(sessionId)
   }
 
-  async createSession(agentId: string): Promise<void> {
-    await this.transport.createSession(agentId)
+  async createSession(agentId: string): Promise<string> {
+    return this.transport.createSession(agentId)
   }
 
   async sendMessage(sessionId: string, text: string): Promise<void> {

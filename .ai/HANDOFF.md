@@ -27,6 +27,11 @@
 - 新增主窗体执行层骨架：`chat-client`、`stream-parser`、`mcp-client`、`mcp-adapter`、`task-record-uploader`。
 - 修复过渡会话运行时的流式分片重复问题，并新增 `tests/webappExecutionLayer.test.ts`。
 - 当前测试状态：`npm test` 通过，`50/50`。
+- 主窗体人工对话主流程已切换为独立网页端执行：网页端直接创建会话、直连流式接口、直连 MCP。
+- 主窗体对子进程桥接的依赖已降为宿主增强能力，主要保留调度、授权和确认弹窗链路。
+- 主窗体默认指向 `C:\dev\projects\work\yxz-agent-webapp` 提供的本机 mock：`8787` 会话服务、`8791` MCP 服务。
+- 新增独立网页端说明文档：`docs/main-window-standalone-web.md`。
+- 修复主窗体独立网页端布局错乱：将字体加载从 `AppProviders` 的 `createGlobalStyle @import` 移到 `webapp/index.html`，并补齐 `html/body/#root` 高度。
 
 ## 仍需确认
 
@@ -34,4 +39,4 @@
 - 任务记录上传失败是否需要业务窗体执行层本地重试。
 - 主窗体和任务子窗体是否共用同一套执行层基础库。
 - 开阳 MCP 完整工具清单。
-- 主窗体真实营小助服务调用最终是仍经子进程代理，还是改为窗体执行层直连正式接口。
+- 任务子窗体是否也按主窗体模式改为独立网页端直连正式接口。

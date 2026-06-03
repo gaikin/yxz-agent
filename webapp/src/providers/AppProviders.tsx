@@ -4,11 +4,10 @@ import { ThemeProvider, createGlobalStyle } from "styled-components"
 import { appTheme } from "../theme/appTheme"
 
 const BaseStyle = createGlobalStyle`
-  @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
-
   html,
   body,
   #root {
+    height: 100%;
     min-height: 100%;
   }
 

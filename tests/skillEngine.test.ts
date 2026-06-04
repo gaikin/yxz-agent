@@ -203,6 +203,108 @@ test("skill script engine supports group, foreach and evaluate builtins", async 
   )
 })
 
+test("skill script engine supports script builtin body mode with injected bindings", async () => {
+  const engine = new SkillScriptEngine({
+    now: createTickingClock(),
+  })
+
+  const result = await engine.run(
+    {
+      skillId: "scriptBuiltinSkill",
+      skillName: "脚本内置工具测试",
+      menuCode: "3040",
+      skillVersion: "1.0.0",
+      steps: [
+        {
+          stepId: "transformValue",
+          output: "transformed",
+          executor: {
+            type: "builtin",
+            toolName: "script",
+          },
+          params: {
+            script:
+              "return { summary: `${name}-${event.menuCode}`, doubled: count * 2, rendered: resolveTemplateValue('menu={{$_EVENT.menuCode}}') }",
+            name: "{{$_EVENT.userName}}",
+            count: 3,
+          },
+        },
+      ],
+    },
+    {
+      event: {
+        menuCode: "3040",
+        userName: "alice",
+      },
+    }
+  )
+
+  assert.equal(result.status, "completed")
+  if (result.status !== "completed") {
+    return
+  }
+
+  assert.deepEqual(result.data, {
+    summary: "alice-3040",
+    doubled: 6,
+    rendered: "menu=3040",
+  })
+})
+
+test("skill script engine injects previous output variables into script builtin scope", async () => {
+  const engine = new SkillScriptEngine({
+    now: createTickingClock(),
+  })
+
+  const result = await engine.run(
+    {
+      skillId: "scriptBuiltinOutputScopeSkill",
+      skillName: "脚本输出作用域测试",
+      menuCode: "3040",
+      skillVersion: "1.0.0",
+      steps: [
+        {
+          stepId: "prepareResult",
+          output: "queryResult",
+          executor: {
+            type: "builtin",
+            toolName: "script",
+          },
+          params: {
+            script:
+              "return { amount: 12, owner: event.userName, tags: ['a', 'b'] }",
+          },
+        },
+        {
+          stepId: "serializeResult",
+          output: "serialized",
+          executor: {
+            type: "builtin",
+            toolName: "script",
+          },
+          params: {
+            script:
+              "return `${queryResult.owner}:${queryResult.amount}:${queryResult.tags.join(',')}`",
+          },
+        },
+      ],
+    },
+    {
+      event: {
+        menuCode: "3040",
+        userName: "alice",
+      },
+    }
+  )
+
+  assert.equal(result.status, "completed")
+  if (result.status !== "completed") {
+    return
+  }
+
+  assert.equal(result.data, "alice:12:a,b")
+})
+
 test("skill script engine maps missing variables to VARIABLE_RESOLVE_FAILED", async () => {
   const engine = new SkillScriptEngine({
     mcpToolClient: {

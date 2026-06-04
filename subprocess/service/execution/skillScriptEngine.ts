@@ -422,7 +422,10 @@ export class SkillScriptEngine {
 
     return builtinTool(params, {
       expressionEngine: this.expressionEngine,
+      values: contextScopeSnapshot(scopeValues),
+      getValue: (path) => getValueByPath(scopeValues, path),
       resolveExpression: (expression) => this.resolveExpression(expression, scopeValues),
+      resolveTemplateValue: (input) => resolveTemplateValue(input, scopeValues),
       signal,
     })
   }
@@ -577,6 +580,12 @@ function createStepRecord(input: {
     error: input.error,
     reason: input.reason,
   }
+}
+
+function contextScopeSnapshot(
+  scopeValues: Record<string, unknown>
+): Record<string, unknown> {
+  return Object.freeze({ ...scopeValues })
 }
 
 function ensureNotAborted(signal: AbortSignal | undefined): void {

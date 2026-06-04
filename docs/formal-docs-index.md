@@ -27,6 +27,7 @@
 | [thin-subprocess-window-agent-architecture.md](C:/dev/projects/work/yxz-agent/docs/thin-subprocess-window-agent-architecture.md) | 支撑设计 | 记录“子进程 + 窗体执行层 + 窗体展示层”的讨论过程和细节 |
 | [webapp-design-integration.md](C:/dev/projects/work/yxz-agent/docs/webapp-design-integration.md) | 支撑设计 | 记录 `C:\dev\projects\work\yxz-agent-webapp` 如何并入当前项目设计 |
 | [event-task-script-authoring-guide.md](C:/dev/projects/work/yxz-agent/docs/event-task-script-authoring-guide.md) | 支撑规范 | 面向配置人员说明事件触发任务脚本的制作规则、工具写法和发布前检查项 |
+| [event-task-script-js-runtime-design.md](C:/dev/projects/work/yxz-agent/docs/event-task-script-js-runtime-design.md) | 支撑设计 | 记录事件触发任务从 JSON DSL 迁移到受控 JS 脚本运行时的方案 |
 
 正式文档与支撑文档冲突时，以正式文档为准；术语冲突时，以 [terminology.md](C:/dev/projects/work/yxz-agent/docs/terminology.md) 为准。
 

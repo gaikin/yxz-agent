@@ -142,7 +142,10 @@ export interface SkillScriptRunOptions {
 
 export interface SkillScriptBuiltinContext {
   expressionEngine: SkillScriptExpressionEngine
+  values: Record<string, unknown>
+  getValue(path: string): unknown
   resolveExpression(expression: Record<string, unknown>): unknown
+  resolveTemplateValue(input: unknown): unknown
   signal?: AbortSignal
 }
 

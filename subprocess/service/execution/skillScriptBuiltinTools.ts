@@ -1,5 +1,6 @@
 import type {
   SkillScriptBuiltinTool,
+  SkillScriptBuiltinContext,
   SkillScriptEngineOptions,
 } from "./skillScriptTypes"
 import { SkillScriptEngineError } from "./skillScriptErrors"
@@ -11,6 +12,23 @@ export function createSkillScriptBuiltinTools(
     evaluate: async (params, context) => {
       const expression = readRecord(params.expression, "evaluate.expression")
       return context.resolveExpression(expression)
+    },
+    script: async (params, context) => {
+      if (typeof params.script !== "string") {
+        throw new SkillScriptEngineError(
+          "INVALID_SCRIPT",
+          "script 内置工具需要提供 params.script"
+        )
+      }
+
+      const scriptParams = omitKeys(params, ["script"])
+      const readonlyContext = createReadonlyScriptContext(context)
+      const scriptSource = readNonEmptyString(params.script, "script.script")
+      const scriptRunner = compileScriptBody(scriptSource)
+      const result = scriptRunner(
+        createScriptBindings(scriptParams, readonlyContext)
+      )
+      return Promise.resolve(result)
     },
     request: async (params, context) => {
       const method = readRequestMethod(params.method)
@@ -52,6 +70,73 @@ export function createSkillScriptBuiltinTools(
   }
 }
 
+type ScriptBuiltinBodyRunner = (
+  bindings: Record<string, unknown>
+) => unknown | Promise<unknown>
+
+function compileScriptBody(source: string): ScriptBuiltinBodyRunner {
+  try {
+    return (bindings) => {
+      const names = Object.keys(bindings)
+      const values = Object.values(bindings)
+      const compiled = Function(...names, `"use strict";\n${source}`) as (
+        ...args: unknown[]
+      ) => unknown
+      return compiled(...values)
+    }
+  } catch (error) {
+    throw new SkillScriptEngineError(
+      "INVALID_SCRIPT",
+      error instanceof Error
+        ? `script.script 编译失败: ${error.message}`
+        : "script.script 编译失败"
+    )
+  }
+}
+
+function createReadonlyScriptContext(
+  context: SkillScriptBuiltinContext
+): Readonly<SkillScriptBuiltinContext> {
+  return Object.freeze({
+    expressionEngine: context.expressionEngine,
+    values: context.values,
+    getValue: context.getValue,
+    resolveExpression: context.resolveExpression,
+    resolveTemplateValue: context.resolveTemplateValue,
+    signal: context.signal,
+  })
+}
+
+function createScriptBindings(
+  scriptParams: Record<string, unknown>,
+  context: Readonly<SkillScriptBuiltinContext>
+): Record<string, unknown> {
+  const bindings: Record<string, unknown> = {
+    params: Object.freeze({ ...scriptParams }),
+    ctx: context,
+    values: context.values,
+    event: context.values.$_EVENT,
+    getValue: context.getValue,
+    resolveExpression: context.resolveExpression,
+    resolveTemplateValue: context.resolveTemplateValue,
+    signal: context.signal,
+  }
+
+  for (const [key, value] of Object.entries(context.values)) {
+    if (isSafeIdentifier(key) && !Object.hasOwn(bindings, key)) {
+      bindings[key] = value
+    }
+  }
+
+  for (const [key, value] of Object.entries(scriptParams)) {
+    if (isSafeIdentifier(key)) {
+      bindings[key] = value
+    }
+  }
+
+  return Object.freeze(bindings)
+}
+
 function readRequestMethod(input: unknown): "GET" | "POST" {
   const method = readNonEmptyString(input, "request.method").toUpperCase()
   if (method !== "GET" && method !== "POST") {
@@ -89,6 +174,23 @@ function readNonNegativeInteger(input: unknown, source: string): number {
     throw new Error(`Invalid integer in ${source}`)
   }
   return input
+}
+
+function omitKeys(
+  input: Record<string, unknown>,
+  keys: string[]
+): Record<string, unknown> {
+  const output: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(input)) {
+    if (!keys.includes(key)) {
+      output[key] = value
+    }
+  }
+  return output
+}
+
+function isSafeIdentifier(input: string): boolean {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(input)
 }
 
 function isRecord(input: unknown): input is Record<string, unknown> {

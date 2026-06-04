@@ -1,6 +1,6 @@
 # TODO
 
-更新时间：2026-06-03
+更新时间：2026-06-04
 
 只保留当前活跃任务；历史和已完成事项归档到 `.ai/archive/`。
 
@@ -9,6 +9,7 @@
 | P1 | 把主窗体最小会话回复替换为真实营小助服务调用 | 待办 | `docs/runtime-flows.md` |
 | P1 | 把 `mcp-client` 和 `mcp-adapter` 接到正式开阳 MCP 链路 | 待办 | `docs/system-architecture.md` |
 | P1 | 明确主窗体和任务子窗体执行层基础库复用边界 | 待确认 | `docs/system-architecture.md` |
+| P1 | 评审受控 JS 脚本运行时方案，并决定是否替换当前 JSON DSL | 待确认 | `docs/event-task-script-js-runtime-design.md` |
 | P1 | 对齐事件触发任务脚本实现与正式方案 | 进行中 | `docs/event-task-script-execution-design.md` |
 | P2 | 建立任务记录真实上传链路并决定失败重试策略 | 待确认 | `docs/runtime-flows.md` |
 | P2 | 处理前端大 chunk 告警，做路由或组件拆包 | 待办 | `webapp/vite.config.ts` |

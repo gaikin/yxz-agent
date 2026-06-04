@@ -35,6 +35,8 @@
 - 任务脚本表达式求值已改为本地手工实现，保留 JSON Logic 风格对象写法，去掉了外部表达式库依赖。
 - 已确认不走“运行时直接执行 JS 表达式”路线；后续若要提升编写体验，建议做“类 JS 写法 -> 受限 DSL”的发布前编译层。
 - 新增独立脚本执行引擎模块：`subprocess/service/execution/skillScriptEngine.ts`。
+- 已新增受控 JS 脚本运行时支撑设计：`docs/event-task-script-js-runtime-design.md`，用于评审是否从 JSON DSL 迁移到“受控 JS + ctx 白名单能力 + 静态扫描 + 超时限制”的执行模型。
+- 已实现实验性 builtin `script`，参数为 `params.function` + 其余业务参数；执行时会向函数传入解析后的 `params` 和只读 `context`，当前主要用于工具结果后处理与序列化。
 - 将脚本执行引擎按职责拆分为小驼峰模块：`skillScriptEngine.ts`、`skillScriptTypes.ts`、`skillScriptValidator.ts`、`skillScriptTemplate.ts`、`skillScriptBuiltinTools.ts`、`skillScriptExamples.ts`、`skillScriptErrors.ts`。
 - 将脚本定义从旧版 `action/saveAs` 模式切换到正式 JSON DSL：`skillName/menuCode/skillVersion + executor/params/output/when/foreach`。
 - `LocalSkillLoader`、调度执行链路、本地示例技能和 `run-local-skill.js` 已接入新引擎模块。
@@ -61,3 +63,5 @@
 - 任务子窗体执行层如何接入新独立脚本执行引擎，并补齐正式运行事件与任务记录上传链路。
 - 对话窗中“任务级摘要”具体展示样式、入口位置，以及历史执行记录的查看交互。
 - 是否需要为配置平台增加“类 JS 写法”到受限 DSL 的编译支持，以改善脚本作者体验。
+- 是否正式采用 `event-task-script-js-runtime-design.md` 中的受控 JS 运行时，并据此调整当前正式脚本方案。
+- builtin `script` 是否继续保持实验能力，还是纳入后续受控 JS 运行时正式设计。

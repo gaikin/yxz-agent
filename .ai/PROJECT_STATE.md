@@ -1,6 +1,6 @@
 # PROJECT_STATE
 
-更新时间：2026-06-03
+更新时间：2026-06-04
 
 ## 1. 快照
 
@@ -23,6 +23,8 @@
 - 主窗体最小正式会话链路已打通：`LIST_AGENTS`、`LIST_SESSIONS`、`CREATE_SESSION`、`GET_SESSION_DETAIL`、`USER_MESSAGE`、`CANCEL_RUN` 已可用。
 - 前端执行层骨架已建立：`chat-client`、`stream-parser`、`mcp-client`、`mcp-adapter`、`task-record-uploader` 已落位。
 - 主窗体独立网页端布局样式已恢复；`styled-components` 的全局样式不再通过 `@import` 注入字体，字体改由 `webapp/index.html` 加载。
+- 任务脚本表达式求值已改为本地手工实现，保留 JSON Logic 风格对象写法，不再依赖外部表达式库。
+- 已明确当前不采用“直接执行 JS 表达式”的方案；如需提升作者体验，应走“类 JS 写法编译到受限 DSL”，而不是在运行时开放 `eval/new Function`。
 - 当前子进程里的 `AssistantSessionService` 仍是过渡实现，只提供最小会话存储和模拟回复，不是正式营小助服务接入。
 
 ## 3. 技术栈
@@ -80,6 +82,7 @@
 - 只有显式声明 `output` 才保存顶层变量。
 - 系统变量当前仅支持 `$_EVENT`。
 - 条件和循环表达式使用 JSON Logic 对象。
+- 运行时表达式求值由仓库内置解释器实现，不再依赖 `json-logic-engine` 或 `json-logic-js`。
 - 缺失变量直接失败，错误码为 `VARIABLE_RESOLVE_FAILED`。
 - 当前已支持 `group`、`foreach`、`evaluate`、`wait`、`request` 和 `USER_CANCELED`。
 
@@ -113,6 +116,7 @@
 - `node --test dist/tests/webappExecutionLayer.test.js` 通过。
 - `npm run build:webapp` 通过，但仍有 chunk size warning。
 - `npm run build:subprocess` 通过。
+- `node --test dist/tests/skillEngine.test.js dist/tests/scheduleSkillRunner.test.js` 通过。
 - 主窗体独立网页端页面已在浏览器中复测，三栏布局和卡片样式恢复正常。
 
 ## 9. 按需扩展

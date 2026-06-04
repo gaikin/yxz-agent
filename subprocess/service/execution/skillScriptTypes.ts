@@ -1,4 +1,4 @@
-import type { LogicEngine } from "json-logic-engine"
+import type { SkillScriptExpressionEngine } from "./skillScriptExpressionEngine"
 
 export type SkillErrorCode =
   | "MENU_OPEN_FAILED"
@@ -141,7 +141,7 @@ export interface SkillScriptRunOptions {
 }
 
 export interface SkillScriptBuiltinContext {
-  expressionEngine: LogicEngine
+  expressionEngine: SkillScriptExpressionEngine
   resolveExpression(expression: Record<string, unknown>): unknown
   signal?: AbortSignal
 }
@@ -156,7 +156,7 @@ export interface SkillScriptEngineOptions {
   builtinTools?: Record<string, SkillScriptBuiltinTool>
   fetchImpl?: typeof fetch
   now?: () => Date
-  expressionEngine?: LogicEngine
+  expressionEngine?: SkillScriptExpressionEngine
   maxControlDepth?: number
   maxExpandedStepCount?: number
 }

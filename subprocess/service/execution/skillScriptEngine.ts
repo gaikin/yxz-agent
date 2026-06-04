@@ -1,5 +1,8 @@
-import { LogicEngine } from "json-logic-engine"
 import { createSkillScriptBuiltinTools } from "./skillScriptBuiltinTools"
+import {
+  createDefaultSkillScriptExpressionEngine,
+  type SkillScriptExpressionEngine,
+} from "./skillScriptExpressionEngine"
 import {
   SkillScriptEngineError,
   toSkillScriptEngineError,
@@ -50,14 +53,15 @@ type StepLifecycleState = {
 }
 
 export class SkillScriptEngine {
-  private readonly expressionEngine: LogicEngine
+  private readonly expressionEngine: SkillScriptExpressionEngine
   private readonly now: () => Date
   private readonly maxControlDepth: number
   private readonly maxExpandedStepCount: number
   private readonly builtinTools: ReturnType<typeof createSkillScriptBuiltinTools>
 
   constructor(private readonly options: SkillScriptEngineOptions) {
-    this.expressionEngine = options.expressionEngine ?? new LogicEngine()
+    this.expressionEngine =
+      options.expressionEngine ?? createDefaultSkillScriptExpressionEngine()
     this.now = options.now ?? (() => new Date())
     this.maxControlDepth = options.maxControlDepth ?? defaultMaxControlDepth
     this.maxExpandedStepCount =

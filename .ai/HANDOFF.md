@@ -1,6 +1,6 @@
 # HANDOFF
 
-更新时间：2026-06-03
+更新时间：2026-06-04
 
 ## 下一次接手必读
 
@@ -32,6 +32,8 @@
 - 主窗体默认指向 `C:\dev\projects\work\yxz-agent-webapp` 提供的本机 mock：`8787` 会话服务、`8791` MCP 服务。
 - 新增独立网页端说明文档：`docs/main-window-standalone-web.md`。
 - 修复主窗体独立网页端布局错乱：将字体加载从 `AppProviders` 的 `createGlobalStyle @import` 移到 `webapp/index.html`，并补齐 `html/body/#root` 高度。
+- 任务脚本表达式求值已改为本地手工实现，保留 JSON Logic 风格对象写法，去掉了外部表达式库依赖。
+- 已确认不走“运行时直接执行 JS 表达式”路线；后续若要提升编写体验，建议做“类 JS 写法 -> 受限 DSL”的发布前编译层。
 - 新增独立脚本执行引擎模块：`subprocess/service/execution/skillScriptEngine.ts`。
 - 将脚本执行引擎按职责拆分为小驼峰模块：`skillScriptEngine.ts`、`skillScriptTypes.ts`、`skillScriptValidator.ts`、`skillScriptTemplate.ts`、`skillScriptBuiltinTools.ts`、`skillScriptExamples.ts`、`skillScriptErrors.ts`。
 - 将脚本定义从旧版 `action/saveAs` 模式切换到正式 JSON DSL：`skillName/menuCode/skillVersion + executor/params/output/when/foreach`。
@@ -47,6 +49,7 @@
 - 新增 `npm run demo:skill:test-mcp`，默认连 `http://127.0.0.1:3000` 的 `test-mcp`，默认跑 `skills/test_mcp_2900_smoke.json`，也支持用命令参数覆盖 skill 文件和事件文件。
 - 已在 2026-06-03 本机验证通过：`MCP_BASE_URL=http://127.0.0.1:3000`、`MCP_SESSION_PATH=/mcp`、`MCP_MESSAGE_PATH=/messages` 下，脚本可完成打开菜单、填值、勾选、点击和读取结果。
 - 已修复本地 runner “脚本执行完成但进程不退出”的问题；根因是本地 CLI 在结果输出后未及时结束，导致 SSE/SDK 清理阶段把 Node 进程挂住。
+- 因 `exports is not defined` 风险，已放弃 `json-logic-js` 方案；当前表达式求值不再依赖任何外部 JSON Logic 包。
 
 ## 仍需确认
 
@@ -57,3 +60,4 @@
 - 任务子窗体是否也按主窗体模式改为独立网页端直连正式接口。
 - 任务子窗体执行层如何接入新独立脚本执行引擎，并补齐正式运行事件与任务记录上传链路。
 - 对话窗中“任务级摘要”具体展示样式、入口位置，以及历史执行记录的查看交互。
+- 是否需要为配置平台增加“类 JS 写法”到受限 DSL 的编译支持，以改善脚本作者体验。

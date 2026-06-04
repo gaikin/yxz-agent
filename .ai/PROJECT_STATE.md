@@ -22,11 +22,12 @@
 - `webapp` 已完成独立 Vite 前端工程接入，主窗体工作台已迁入当前仓库。
 - 主窗体最小正式会话链路已打通：`LIST_AGENTS`、`LIST_SESSIONS`、`CREATE_SESSION`、`GET_SESSION_DETAIL`、`USER_MESSAGE`、`CANCEL_RUN` 已可用。
 - 前端执行层骨架已建立：`chat-client`、`stream-parser`、`mcp-client`、`mcp-adapter`、`task-record-uploader` 已落位。
+- 底层 MCP 客户端已同时支持标准 `tools/call` 和 `resources/read`；当前按正式路径实现，不做把资源读取回退为工具调用的兼容层。
 - 主窗体独立网页端布局样式已恢复；`styled-components` 的全局样式不再通过 `@import` 注入字体，字体改由 `webapp/index.html` 加载。
 - 任务脚本表达式求值已改为本地手工实现，保留 JSON Logic 风格对象写法，不再依赖外部表达式库。
 - 已明确当前不采用“直接执行 JS 表达式”的方案；如需提升作者体验，应走“类 JS 写法编译到受限 DSL”，而不是在运行时开放 `eval/new Function`。
 - 已新增受控 JS 脚本运行时支撑设计，方向是“可执行 JS 语法 + 受控 `ctx` 能力注入 + 静态扫描 + 资源限制”，目前仍待评审，不是正式方案。
-- 当前代码已新增实验性 builtin `script`：通过 `params.function` 传入函数字符串，执行时向函数注入只读上下文，主要用于结果后处理；该能力尚未进入正式文档口径。
+- 当前代码已新增实验性 builtin `script`：通过 `params.script` 传入脚本体，底层使用 `Function` 执行并注入只读上下文，主要用于结果后处理；该能力尚未进入正式文档口径。
 - 当前子进程里的 `AssistantSessionService` 仍是过渡实现，只提供最小会话存储和模拟回复，不是正式营小助服务接入。
 
 ## 3. 技术栈
@@ -82,6 +83,7 @@
 - `beforeDelayMs` 可选、不设最大值、必须可取消。
 - 工具结果默认不进入变量上下文。
 - 只有显式声明 `output` 才保存顶层变量。
+- 若步骤声明了 `output`，但执行结果为 `undefined`，当前会直接以 `STEP_OUTPUT_UNDEFINED` 失败，避免把不可用值继续带入后续模板解析。
 - 系统变量当前仅支持 `$_EVENT`。
 - 条件和循环表达式使用 JSON Logic 对象。
 - 运行时表达式求值由仓库内置解释器实现，不再依赖 `json-logic-engine` 或 `json-logic-js`。

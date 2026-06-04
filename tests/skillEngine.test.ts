@@ -203,6 +203,91 @@ test("skill script engine supports group, foreach and evaluate builtins", async 
   )
 })
 
+test("skill script engine resolves nested object params before mcp tool call", async () => {
+  const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+  const engine = new SkillScriptEngine({
+    mcpToolClient: {
+      async call(name, args) {
+        calls.push({ name, args })
+        return { ok: true }
+      },
+    },
+    now: createTickingClock(),
+  })
+
+  const result = await engine.run(
+    {
+      skillId: "nestedToolParamsSkill",
+      skillName: "嵌套参数解析测试",
+      menuCode: "3040",
+      skillVersion: "1.0.0",
+      steps: [
+        {
+          stepId: "callTool",
+          executor: {
+            type: "mcp",
+            mcpName: "kaiyang",
+            toolName: "executeComplexAction",
+          },
+          params: {
+            tabId: "{{$_EVENT.tabId}}",
+            payload: {
+              filters: {
+                owner: "{{$_EVENT.user.name}}",
+                tags: ["{{$_EVENT.tags.0}}", "{{$_EVENT.tags.1}}"],
+              },
+              commands: [
+                {
+                  componentId: "{{$_EVENT.components.submit}}",
+                  meta: {
+                    reason: "owner={{$_EVENT.user.name}}",
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    {
+      event: {
+        tabId: "tab_nested_001",
+        user: {
+          name: "alice",
+        },
+        tags: ["finance", "today"],
+        components: {
+          submit: "btn_submit",
+        },
+      },
+    }
+  )
+
+  assert.equal(result.status, "completed")
+  assert.deepEqual(calls, [
+    {
+      name: "executeComplexAction",
+      args: {
+        tabId: "tab_nested_001",
+        payload: {
+          filters: {
+            owner: "alice",
+            tags: ["finance", "today"],
+          },
+          commands: [
+            {
+              componentId: "btn_submit",
+              meta: {
+                reason: "owner=alice",
+              },
+            },
+          ],
+        },
+      },
+    },
+  ])
+})
+
 test("skill script engine supports script builtin body mode with injected bindings", async () => {
   const engine = new SkillScriptEngine({
     now: createTickingClock(),
@@ -303,6 +388,71 @@ test("skill script engine injects previous output variables into script builtin 
   }
 
   assert.equal(result.data, "alice:12:a,b")
+})
+
+test("skill script engine fails fast when output step returns undefined", async () => {
+  const engine = new SkillScriptEngine({
+    mcpToolClient: {
+      async call() {
+        return undefined
+      },
+    },
+    now: createTickingClock(),
+  })
+
+  const result = await engine.run({
+    skillId: "undefinedOutputSkill",
+    skillName: "未定义输出测试",
+    menuCode: "3040",
+    skillVersion: "1.0.0",
+    steps: [
+      {
+        stepId: "readSomething",
+        output: "queryResult",
+        executor: {
+          type: "mcp",
+          mcpName: "kaiyang",
+          toolName: "readSomething",
+        },
+        params: {
+          tabId: "tab_001",
+        },
+      },
+    ],
+  })
+
+  assert.deepEqual(result, {
+    status: "failed",
+    error: {
+      code: "STEP_OUTPUT_UNDEFINED",
+      message:
+        "步骤 readSomething 声明了 output=queryResult，但执行结果为 undefined",
+    },
+    steps: [
+      {
+        stepId: "readSomething",
+        stepPath: "readSomething",
+        status: "failed",
+        executor: {
+          type: "mcp",
+          mcpName: "kaiyang",
+          toolName: "readSomething",
+        },
+        beforeDelayMs: 0,
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:01.000Z",
+        durationMs: 1000,
+        outputName: "queryResult",
+        result: undefined,
+        error: {
+          code: "STEP_OUTPUT_UNDEFINED",
+          message:
+            "步骤 readSomething 声明了 output=queryResult，但执行结果为 undefined",
+        },
+        reason: undefined,
+      },
+    ],
+  })
 })
 
 test("skill script engine maps missing variables to VARIABLE_RESOLVE_FAILED", async () => {

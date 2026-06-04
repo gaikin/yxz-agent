@@ -54,6 +54,29 @@ test("json rpc tool client wraps tool call in tools/call envelope", async () => 
   })
 })
 
+test("json rpc tool client wraps resource read in resources/read envelope", async () => {
+  let captured: unknown
+  const client = new JsonRpcMcpToolClient({
+    async send(request) {
+      captured = request
+      return { contents: [{ uri: "resource://demo", text: "ok" }] }
+    },
+    close() {},
+  })
+
+  const result = await client.readResource("resource://demo")
+
+  assert.deepEqual(result, { contents: [{ uri: "resource://demo", text: "ok" }] })
+  assert.deepEqual(captured, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "resources/read",
+    params: {
+      uri: "resource://demo",
+    },
+  })
+})
+
 test("sse session transport creates session then posts message with sessionId", async () => {
   const capturedRequests: Array<{ url: string; body?: string; method?: string }> = []
   const sseStream = new PassThrough()
@@ -524,5 +547,80 @@ test("sse session transport can still return immediate synchronous response bodi
   })
 
   assert.deepEqual(response, { content: [], ok: true })
+  transport.close()
+})
+
+test("sse session transport supports standard resources/read requests", async () => {
+  const client = {
+    async get(url: string) {
+      return {
+        status: 200,
+        headers: {
+          "mcp-session-id": "session-resource",
+          "content-type": "text/event-stream",
+        },
+        data: Readable.from([]),
+        request: {
+          res: {
+            responseUrl: url,
+          },
+        },
+      }
+    },
+    async post(_url: string, body: unknown) {
+      const request = parseRequest(body)
+      if (request.method === "initialize" && typeof request.id === "number") {
+        return {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+          data: createInitializeResponse(request.id),
+        }
+      }
+
+      return {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+        data: {
+          jsonrpc: "2.0",
+          id: request.id,
+          result: {
+            contents: [
+              {
+                uri: "resource://demo",
+                text: "schema-ok",
+              },
+            ],
+          },
+        },
+      }
+    },
+  }
+
+  const transport = new SseSessionJsonRpcToolTransport({
+    baseUrl: "http://127.0.0.1:26666",
+    client: client as never,
+  })
+
+  const response = await transport.send({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "resources/read",
+    params: {
+      uri: "resource://demo",
+    },
+  })
+
+  assert.deepEqual(response, {
+    contents: [
+      {
+        uri: "resource://demo",
+        text: "schema-ok",
+      },
+    ],
+  })
   transport.close()
 })

@@ -36,7 +36,8 @@
 - 已确认不走“运行时直接执行 JS 表达式”路线；后续若要提升编写体验，建议做“类 JS 写法 -> 受限 DSL”的发布前编译层。
 - 新增独立脚本执行引擎模块：`subprocess/service/execution/skillScriptEngine.ts`。
 - 已新增受控 JS 脚本运行时支撑设计：`docs/event-task-script-js-runtime-design.md`，用于评审是否从 JSON DSL 迁移到“受控 JS + ctx 白名单能力 + 静态扫描 + 超时限制”的执行模型。
-- 已实现实验性 builtin `script`，参数为 `params.function` + 其余业务参数；执行时会向函数传入解析后的 `params` 和只读 `context`，当前主要用于工具结果后处理与序列化。
+- 已实现实验性 builtin `script`，参数为 `params.script` + 其余业务参数；执行时会向脚本注入解析后的参数、前序输出变量和只读上下文，当前主要用于工具结果后处理与序列化。
+- 底层 `subprocess/service/execution/mcpToolClient.ts` 已支持标准 `resources/read`，不再只有 `tools/call`；当前按正式路径实现，不做把资源读取回退为工具调用的兼容层。已补 `tests/mcpToolClient.test.ts` 回归测试，但上层业务调用点还没统一改成按语义显式区分 tool 和 resource。
 - 将脚本执行引擎按职责拆分为小驼峰模块：`skillScriptEngine.ts`、`skillScriptTypes.ts`、`skillScriptValidator.ts`、`skillScriptTemplate.ts`、`skillScriptBuiltinTools.ts`、`skillScriptExamples.ts`、`skillScriptErrors.ts`。
 - 将脚本定义从旧版 `action/saveAs` 模式切换到正式 JSON DSL：`skillName/menuCode/skillVersion + executor/params/output/when/foreach`。
 - `LocalSkillLoader`、调度执行链路、本地示例技能和 `run-local-skill.js` 已接入新引擎模块。
@@ -52,6 +53,7 @@
 - 已在 2026-06-03 本机验证通过：`MCP_BASE_URL=http://127.0.0.1:3000`、`MCP_SESSION_PATH=/mcp`、`MCP_MESSAGE_PATH=/messages` 下，脚本可完成打开菜单、填值、勾选、点击和读取结果。
 - 已修复本地 runner “脚本执行完成但进程不退出”的问题；根因是本地 CLI 在结果输出后未及时结束，导致 SSE/SDK 清理阶段把 Node 进程挂住。
 - 因 `exports is not defined` 风险，已放弃 `json-logic-js` 方案；当前表达式求值不再依赖任何外部 JSON Logic 包。
+- 已补脚本引擎保护：若某一步声明了 `output`，但工具或 builtin 返回 `undefined`，引擎会立刻以 `STEP_OUTPUT_UNDEFINED` 失败，不再把 `undefined` 写入变量上下文后拖到后续模板替换时报错。
 
 ## 仍需确认
 

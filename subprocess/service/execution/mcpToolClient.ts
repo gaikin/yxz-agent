@@ -18,8 +18,21 @@ export interface JsonRpcToolCallRequest {
   }
 }
 
+export interface JsonRpcReadResourceRequest {
+  jsonrpc: "2.0"
+  id: number
+  method: "resources/read"
+  params: {
+    uri: string
+  }
+}
+
+export type JsonRpcMcpRequest =
+  | JsonRpcToolCallRequest
+  | JsonRpcReadResourceRequest
+
 export interface JsonRpcToolTransport {
-  send(request: JsonRpcToolCallRequest): Promise<unknown>
+  send(request: JsonRpcMcpRequest): Promise<unknown>
   close(): void
 }
 
@@ -672,26 +685,35 @@ export class SseSessionJsonRpcToolTransport implements JsonRpcToolTransport {
     })
   }
 
-  async send(request: JsonRpcToolCallRequest): Promise<unknown> {
+  async send(request: JsonRpcMcpRequest): Promise<unknown> {
     if (this.closed) {
       throw new Error("MCP transport is closed")
     }
 
-    if (request.method !== "tools/call") {
-      throw new Error("Unsupported MCP request method: " + request.method)
+    const client = await this.getSdkClient()
+    if (request.method === "tools/call") {
+      return this.withTimeout(
+        client.callTool(
+          {
+            name: request.params.name,
+            arguments: request.params.arguments,
+          },
+          CompatibilityCallToolResultSchema
+        ),
+        request.id
+      )
     }
 
-    const client = await this.getSdkClient()
-    return this.withTimeout(
-      client.callTool(
-        {
-          name: request.params.name,
-          arguments: request.params.arguments,
-        },
-        CompatibilityCallToolResultSchema
-      ),
-      request.id
-    )
+    if (request.method === "resources/read") {
+      return this.withTimeout(
+        client.readResource({
+          uri: request.params.uri,
+        }),
+        request.id
+      )
+    }
+
+    throw new Error("Unsupported MCP request method")
   }
 
   close(): void {
@@ -763,6 +785,8 @@ export { SseSessionJsonRpcToolTransport as HttpJsonRpcToolTransport }
 
 export interface McpToolClient {
   call(name: string, args: Record<string, unknown>): Promise<unknown>
+  callTool(name: string, args: Record<string, unknown>): Promise<unknown>
+  readResource(uri: string): Promise<unknown>
 }
 
 export class JsonRpcMcpToolClient implements McpToolClient {
@@ -771,6 +795,10 @@ export class JsonRpcMcpToolClient implements McpToolClient {
   constructor(private readonly transport: JsonRpcToolTransport) {}
 
   call(name: string, args: Record<string, unknown>): Promise<unknown> {
+    return this.callTool(name, args)
+  }
+
+  callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     const request: JsonRpcToolCallRequest = {
       jsonrpc: "2.0",
       id: this.nextId++,
@@ -778,6 +806,19 @@ export class JsonRpcMcpToolClient implements McpToolClient {
       params: {
         name: name,
         arguments: args,
+      },
+    }
+
+    return this.transport.send(request)
+  }
+
+  readResource(uri: string): Promise<unknown> {
+    const request: JsonRpcReadResourceRequest = {
+      jsonrpc: "2.0",
+      id: this.nextId++,
+      method: "resources/read",
+      params: {
+        uri,
       },
     }
 

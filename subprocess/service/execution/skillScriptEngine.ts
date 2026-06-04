@@ -200,6 +200,12 @@ export class SkillScriptEngine {
         )
         runtime.lastToolResult = result
         if (step.output) {
+          if (result === undefined) {
+            throw new SkillScriptEngineError(
+              "STEP_OUTPUT_UNDEFINED",
+              `步骤 ${step.stepId} 声明了 output=${step.output}，但执行结果为 undefined`
+            )
+          }
           runtime.values[step.output] = result
         }
 
